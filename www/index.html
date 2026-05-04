@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0a">
+  <title>Дневник</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="tabs">
+    <button class="tab active" data-tab="today">Сегодня</button>
+    <button class="tab" data-tab="history">История</button>
+    <button class="tab" data-tab="reminders">Напоминания</button>
+  </nav>
+
+  <main>
+    <section id="today" class="screen active">
+      <header class="header">
+        <h1 id="todayDate"></h1>
+      </header>
+
+      <div class="field">
+        <label>Оценка дня</label>
+        <div class="stars" id="stars"></div>
+        <div class="rating-value" id="ratingValue">—</div>
+      </div>
+
+      <div class="field">
+        <label>Что сделал сегодня</label>
+        <textarea id="done" placeholder="Что было сделано…"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Что улучшить</label>
+        <textarea id="improve" placeholder="Что хочется поправить…"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Заметки</label>
+        <textarea id="notes" placeholder="Свободные мысли…"></textarea>
+      </div>
+
+      <button id="save" class="primary">Сохранить</button>
+    </section>
+
+    <section id="history" class="screen">
+      <header class="header"><h1>История</h1></header>
+      <div id="entries"></div>
+    </section>
+
+    <section id="reminders" class="screen">
+      <header class="header"><h1>Напоминания</h1></header>
+
+      <div class="field">
+        <label>Сообщение</label>
+        <input type="text" id="reminderText" placeholder="Что напомнить?">
+      </div>
+
+      <div class="field">
+        <label>Когда</label>
+        <input type="datetime-local" id="reminderTime">
+      </div>
+
+      <button id="addReminder" class="primary">Поставить</button>
+
+      <div class="divider"></div>
+
+      <div id="remindersList"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

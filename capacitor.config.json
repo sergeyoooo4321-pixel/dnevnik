@@ -1,0 +1,8 @@
+{
+  "appId": "app.dnevnik.diary",
+  "appName": "Дневник",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  }
+}
