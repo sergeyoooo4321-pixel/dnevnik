@@ -833,3 +833,53 @@ textarea:focus, input:focus {
 }
 .ota-status.ok { color: var(--tag-task); border-color: var(--tag-task); }
 .ota-status.warn { color: var(--tag-important); border-color: var(--tag-important); }
+
+/* OTA menu entry (version + update button) */
+.menu-version {
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.menu-version-static {
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.menu-version-title {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.menu-version-sub {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-top: 1px;
+}
+.menu-update {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.menu-update .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag-task);
+  margin-top: 5px;
+  flex-shrink: 0;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.menu-update-title {
+  font-weight: 500;
+  font-size: 14px;
+  display: block;
+  color: var(--fg);
+}
+.menu-update[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
