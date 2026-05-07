@@ -815,3 +815,21 @@ textarea:focus, input:focus {
   min-width: 90px;
   margin-top: 0;
 }
+
+/* OTA status pill */
+.ota-status {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.ota-status.ok { color: var(--tag-task); border-color: var(--tag-task); }
+.ota-status.warn { color: var(--tag-important); border-color: var(--tag-important); }
