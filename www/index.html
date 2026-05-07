@@ -11,19 +11,26 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <nav class="tabs">
-    <button class="tab active" data-tab="today">День</button>
-    <button class="tab" data-tab="notes">Заметки</button>
-    <button class="tab" data-tab="history">История</button>
-    <button class="tab" data-tab="reminders">Напоминания</button>
-  </nav>
+  <header class="topbar">
+    <h1 class="topbar-title" id="screenTitle">День</h1>
+    <button class="kebab" id="kebabBtn" aria-label="Меню" aria-haspopup="true" aria-expanded="false">
+      <span class="kebab-dot"></span>
+      <span class="kebab-dot"></span>
+      <span class="kebab-dot"></span>
+    </button>
+    <div class="menu-backdrop" id="menuBackdrop" hidden></div>
+    <div class="menu" id="menu" role="menu" hidden>
+      <button class="menu-item active" role="menuitem" data-tab="today">День</button>
+      <button class="menu-item" role="menuitem" data-tab="notes">Заметки</button>
+      <button class="menu-item" role="menuitem" data-tab="history">История</button>
+      <button class="menu-item" role="menuitem" data-tab="reminders">Напоминания</button>
+    </div>
+  </header>
 
   <main>
     <!-- ===== СЕГОДНЯ ===== -->
     <section id="today" class="screen active">
-      <header class="header">
-        <h1 id="todayDate"></h1>
-      </header>
+      <div class="subtitle" id="todayDate"></div>
 
       <div class="field">
         <label>Оценка дня</label>
@@ -52,8 +59,6 @@
 
     <!-- ===== ЗАМЕТКИ ===== -->
     <section id="notes" class="screen">
-      <header class="header"><h1>Заметки</h1></header>
-
       <div class="card">
         <div class="field">
           <div class="label-row">
@@ -83,14 +88,11 @@
 
     <!-- ===== ИСТОРИЯ ===== -->
     <section id="history" class="screen">
-      <header class="header"><h1>История</h1></header>
       <div id="entries"></div>
     </section>
 
     <!-- ===== НАПОМИНАНИЯ ===== -->
     <section id="reminders" class="screen">
-      <header class="header"><h1>Напоминания</h1></header>
-
       <div class="card">
         <div class="seg" id="reminderMode">
           <button class="seg-btn active" data-mode="once">Разовое</button>

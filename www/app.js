@@ -65,21 +65,61 @@
     toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
   };
 
-  // ---------- Tabs ----------
+  // ---------- Tabs / Kebab menu ----------
+  const SCREEN_TITLES = {
+    today: 'День',
+    notes: 'Заметки',
+    history: 'История',
+    reminders: 'Напоминания',
+  };
+
   const switchTab = (name) => {
-    document.querySelectorAll('.tab').forEach((t) =>
+    document.querySelectorAll('.menu-item').forEach((t) =>
       t.classList.toggle('active', t.dataset.tab === name)
     );
     document.querySelectorAll('.screen').forEach((s) =>
       s.classList.toggle('active', s.id === name)
     );
+    const titleEl = $('screenTitle');
+    if (titleEl && SCREEN_TITLES[name]) titleEl.textContent = SCREEN_TITLES[name];
     if (name === 'history') renderHistory();
     if (name === 'notes') renderNotes();
     if (name === 'reminders') renderReminders();
     if (name === 'today') loadToday();
   };
-  document.querySelectorAll('.tab').forEach((tab) =>
-    tab.addEventListener('click', () => switchTab(tab.dataset.tab))
+
+  const menuEl = $('menu');
+  const backdropEl = $('menuBackdrop');
+  const kebabBtn = $('kebabBtn');
+
+  const openMenu = () => {
+    menuEl.hidden = false;
+    backdropEl.hidden = false;
+    kebabBtn.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => menuEl.classList.add('open'));
+  };
+  const closeMenu = () => {
+    menuEl.classList.remove('open');
+    menuEl.hidden = true;
+    backdropEl.hidden = true;
+    kebabBtn.setAttribute('aria-expanded', 'false');
+  };
+  const toggleMenu = () => (menuEl.hidden ? openMenu() : closeMenu());
+
+  kebabBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+  backdropEl.addEventListener('click', closeMenu);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menuEl.hidden) closeMenu();
+  });
+
+  document.querySelectorAll('.menu-item').forEach((item) =>
+    item.addEventListener('click', () => {
+      switchTab(item.dataset.tab);
+      closeMenu();
+    })
   );
 
   // ---------- Voice input ----------

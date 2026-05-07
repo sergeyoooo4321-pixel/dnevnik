@@ -44,37 +44,105 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.tabs {
-  display: flex;
+.topbar {
   position: sticky;
   top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
-  z-index: 10;
+  padding: 0 12px 0 16px;
   padding-top: env(safe-area-inset-top);
+  height: calc(52px + env(safe-area-inset-top));
 }
 
-.tab {
-  flex: 1;
-  padding: 14px 4px;
+.topbar-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+
+.kebab {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   background: none;
   border: none;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 999px;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  letter-spacing: 0.02em;
+  padding: 0;
   font-family: inherit;
+  transition: background 0.15s;
+}
+.kebab:active { background: var(--border); }
+
+.kebab-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--fg);
+  display: block;
 }
 
-.tab.active {
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 30;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% - 4px);
+  right: 8px;
+  z-index: 40;
+  min-width: 180px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: top right;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.menu-item {
+  text-align: left;
+  padding: 10px 14px;
+  background: none;
+  border: none;
   color: var(--fg);
-  border-bottom-color: var(--accent);
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.menu-item:hover { background: var(--border); }
+.menu-item:active { background: var(--border); opacity: 0.85; }
+.menu-item.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 500;
 }
 
 main {
-  padding: 8px 16px 80px;
+  padding: 16px 16px 80px;
   max-width: 640px;
   margin: 0 auto;
 }
@@ -82,12 +150,11 @@ main {
 .screen { display: none; }
 .screen.active { display: block; }
 
-.header { padding: 20px 0 24px; }
-
-h1 {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+.subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 18px;
+  letter-spacing: 0.01em;
 }
 
 .field { margin-bottom: 20px; }
