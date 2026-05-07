@@ -32,7 +32,7 @@
     <section id="today" class="screen active">
       <div class="subtitle" id="todayDate"></div>
 
-      <div id="todayPlan"></div>
+      <div id="todayCourses"></div>
 
       <div class="field">
         <label>Оценка дня</label>
@@ -127,41 +127,79 @@
       <div id="remindersList"></div>
     </section>
 
-    <!-- ===== ПЛАН ===== -->
+    <!-- ===== ПЛАН (course tracker) ===== -->
     <section id="plan" class="screen">
-      <button id="newSubjectBtn" class="primary">+ Новый предмет</button>
-
-      <div id="newSubjectForm" class="card" hidden style="margin-top:12px;">
-        <div class="field">
-          <label>Название</label>
-          <input type="text" id="newSubjectName" placeholder="Математика, физика…">
+      <!-- View 1: list of courses -->
+      <div id="planCourses">
+        <div class="plan-head">
+          <div class="plan-head-title">Мои курсы</div>
+          <button class="ghost plan-import-btn" id="openImportBtn">+ Импорт</button>
         </div>
-        <div class="field">
-          <label>Цвет</label>
-          <div class="color-picker" id="newSubjectColor"></div>
-        </div>
-        <div class="plan-form-actions">
-          <button id="newSubjectCancel" class="ghost">Отмена</button>
-          <button id="newSubjectSave" class="primary">Создать</button>
-        </div>
+        <div id="coursesList"></div>
       </div>
 
-      <div class="divider"></div>
+      <!-- View 2: course detail (day list) -->
+      <div id="planCourseDetail" hidden>
+        <button class="ghost back-btn" id="backToCoursesBtn">← Курсы</button>
+        <div id="courseDetailHead"></div>
+        <div id="daysList"></div>
+      </div>
 
-      <div id="subjectsList"></div>
+      <!-- View 3: day detail -->
+      <div id="planDayDetail" hidden>
+        <button class="ghost back-btn" id="backToDaysBtn">← Дни</button>
+        <div id="dayDetailBody"></div>
+      </div>
     </section>
   </main>
 
-  <!-- Pomodoro overlay -->
-  <div id="pomodoroOverlay" class="pomodoro-overlay" hidden>
-    <div class="pomodoro-subject" id="pomodoroSubject"></div>
-    <div class="pomodoro-phase" id="pomodoroPhase">Учим</div>
-    <div class="pomodoro-time" id="pomodoroTime">25:00</div>
-    <div class="pomodoro-cycles" id="pomodoroCycles">Циклов: 0</div>
-    <div class="pomodoro-actions">
-      <button class="ghost" id="pomodoroPause">Пауза</button>
-      <button class="ghost" id="pomodoroSkip">Пропустить</button>
-      <button class="primary" id="pomodoroStop">Стоп</button>
+  <!-- Import course modal -->
+  <div id="importOverlay" class="import-overlay" hidden>
+    <div class="import-modal">
+      <div class="import-head">
+        <div class="import-title">Импорт курса</div>
+        <button class="ghost import-close" id="importCloseBtn" aria-label="Закрыть">×</button>
+      </div>
+
+      <div class="field">
+        <label>Название курса</label>
+        <input type="text" id="importName" placeholder="Мой курс">
+      </div>
+
+      <div class="field">
+        <label>Цель</label>
+        <input type="text" id="importGoal" placeholder="Необязательно">
+      </div>
+
+      <div class="field">
+        <label>Дата старта</label>
+        <input type="date" id="importStart">
+      </div>
+
+      <div class="field">
+        <div class="label-row">
+          <label>Markdown курса</label>
+          <button class="mic" data-target="importMarkdown" aria-label="Голос">🎤</button>
+        </div>
+        <textarea id="importMarkdown" placeholder="Вставь сюда markdown…" style="min-height:180px;"></textarea>
+      </div>
+
+      <div class="import-actions">
+        <button class="ghost" id="importCancelBtn">Отмена</button>
+        <button class="primary" id="importDoBtn">Импортировать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase timer overlay -->
+  <div id="timerOverlay" class="timer-overlay" hidden>
+    <div class="timer-label" id="timerLabel">Теория</div>
+    <div class="timer-time" id="timerTime">30:00</div>
+    <div class="timer-sub" id="timerSub">День 1</div>
+    <div class="timer-actions">
+      <button class="ghost" id="timerPause">Пауза</button>
+      <button class="ghost" id="timerExtend">+5 мин</button>
+      <button class="primary" id="timerStop">Стоп</button>
     </div>
   </div>
 
