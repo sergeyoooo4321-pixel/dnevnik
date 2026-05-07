@@ -6,6 +6,13 @@
   --accent: #111111;
   --card: #fafafa;
   --danger: #c44;
+
+  --tag-think: #5a8def;
+  --tag-important: #e05656;
+  --tag-idea: #d4a017;
+  --tag-task: #2ea043;
+  --tag-question: #a36ef0;
+  --tag-default: #8a8a8a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -49,11 +56,11 @@ body {
 
 .tab {
   flex: 1;
-  padding: 16px 8px;
+  padding: 14px 4px;
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   border-bottom: 2px solid transparent;
@@ -75,9 +82,7 @@ main {
 .screen { display: none; }
 .screen.active { display: block; }
 
-.header {
-  padding: 20px 0 24px;
-}
+.header { padding: 20px 0 24px; }
 
 h1 {
   font-size: 22px;
@@ -85,22 +90,29 @@ h1 {
   letter-spacing: -0.01em;
 }
 
-.field {
-  margin-bottom: 20px;
+.field { margin-bottom: 20px; }
+
+.label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 label {
   display: block;
   font-size: 12px;
   color: var(--muted);
-  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
+.label-row label { margin-bottom: 0; }
+
 textarea,
 input[type="text"],
-input[type="datetime-local"] {
+input[type="date"],
+input[type="time"] {
   width: 100%;
   padding: 12px 14px;
   background: var(--card);
@@ -118,10 +130,36 @@ textarea {
   resize: vertical;
 }
 
-textarea:focus,
-input:focus {
+textarea:focus, input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.mic {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--fg);
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.mic:active { background: var(--border); }
+.mic.listening {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .stars {
@@ -143,7 +181,6 @@ input:focus {
   user-select: none;
   transition: color 0.1s, transform 0.1s;
 }
-
 .star.active { color: var(--accent); }
 .star:active { transform: scale(0.9); }
 
@@ -167,7 +204,6 @@ input:focus {
   font-family: inherit;
   transition: opacity 0.15s;
 }
-
 .primary:active { opacity: 0.8; }
 
 .divider {
@@ -176,6 +212,73 @@ input:focus {
   margin: 24px 0 16px;
 }
 
+.card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+/* Segmented control */
+.seg {
+  display: flex;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.seg-btn.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* Tag picker */
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.tag-chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tag-default);
+}
+.tag-chip.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+/* Diary entries */
 .entry {
   padding: 16px;
   border: 1px solid var(--border);
@@ -183,25 +286,21 @@ input:focus {
   margin-bottom: 10px;
   background: var(--card);
 }
-
 .entry-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
 }
-
 .entry-date {
   font-weight: 500;
   font-size: 14px;
 }
-
 .entry-rating {
   color: var(--muted);
   font-size: 12px;
   letter-spacing: 0.08em;
 }
-
 .entry-text {
   font-size: 14px;
   margin-top: 6px;
@@ -209,7 +308,6 @@ input:focus {
   white-space: pre-wrap;
   word-break: break-word;
 }
-
 .entry-text .label {
   color: var(--muted);
   font-size: 11px;
@@ -219,6 +317,45 @@ input:focus {
   margin-bottom: 2px;
 }
 
+/* Notes */
+.note {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: var(--card);
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.note-bar {
+  width: 3px;
+  align-self: stretch;
+  border-radius: 2px;
+  background: var(--tag-default);
+  flex-shrink: 0;
+}
+.note-body { flex: 1; min-width: 0; }
+.note-text {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 6px;
+}
+.note-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.note-tag {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+
+/* Reminders */
 .reminder {
   padding: 14px 16px;
   border: 1px solid var(--border);
@@ -230,7 +367,6 @@ input:focus {
   gap: 12px;
   background: var(--card);
 }
-
 .reminder-info { flex: 1; min-width: 0; }
 .reminder-text {
   font-size: 14px;
@@ -240,6 +376,18 @@ input:focus {
 .reminder-time {
   font-size: 12px;
   color: var(--muted);
+}
+.reminder-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--bg);
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .delete {
@@ -252,13 +400,14 @@ input:focus {
   padding: 6px 10px;
   font-family: inherit;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 .delete:active { background: var(--border); }
 
 .empty {
   text-align: center;
   color: var(--muted);
-  padding: 48px 20px;
+  padding: 32px 20px;
   font-size: 14px;
 }
 
@@ -276,5 +425,7 @@ input:focus {
   pointer-events: none;
   transition: opacity 0.2s;
   z-index: 100;
+  max-width: calc(100% - 32px);
+  text-align: center;
 }
 .toast.show { opacity: 1; }

@@ -9,12 +9,14 @@
 </head>
 <body>
   <nav class="tabs">
-    <button class="tab active" data-tab="today">Сегодня</button>
+    <button class="tab active" data-tab="today">День</button>
+    <button class="tab" data-tab="notes">Заметки</button>
     <button class="tab" data-tab="history">История</button>
     <button class="tab" data-tab="reminders">Напоминания</button>
   </nav>
 
   <main>
+    <!-- ===== СЕГОДНЯ ===== -->
     <section id="today" class="screen active">
       <header class="header">
         <h1 id="todayDate"></h1>
@@ -27,42 +29,91 @@
       </div>
 
       <div class="field">
-        <label>Что сделал сегодня</label>
+        <div class="label-row">
+          <label>Что сделал сегодня</label>
+          <button class="mic" data-target="done" aria-label="Голос">🎤</button>
+        </div>
         <textarea id="done" placeholder="Что было сделано…"></textarea>
       </div>
 
       <div class="field">
-        <label>Что улучшить</label>
+        <div class="label-row">
+          <label>Что улучшить</label>
+          <button class="mic" data-target="improve" aria-label="Голос">🎤</button>
+        </div>
         <textarea id="improve" placeholder="Что хочется поправить…"></textarea>
       </div>
 
-      <div class="field">
-        <label>Заметки</label>
-        <textarea id="notes" placeholder="Свободные мысли…"></textarea>
-      </div>
-
-      <button id="save" class="primary">Сохранить</button>
+      <button id="save" class="primary">Сохранить день</button>
     </section>
 
+    <!-- ===== ЗАМЕТКИ ===== -->
+    <section id="notes" class="screen">
+      <header class="header"><h1>Заметки</h1></header>
+
+      <div class="card">
+        <div class="field">
+          <div class="label-row">
+            <label>Новая заметка</label>
+            <button class="mic" data-target="noteText" aria-label="Голос">🎤</button>
+          </div>
+          <textarea id="noteText" placeholder="Мысль, идея, что угодно…"></textarea>
+        </div>
+
+        <div class="field">
+          <label>Метка</label>
+          <div class="tag-picker" id="tagPicker"></div>
+        </div>
+
+        <button id="addNote" class="primary">Добавить заметку</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label>Фильтр</label>
+        <div class="tag-picker" id="filterPicker"></div>
+      </div>
+
+      <div id="notesList"></div>
+    </section>
+
+    <!-- ===== ИСТОРИЯ ===== -->
     <section id="history" class="screen">
       <header class="header"><h1>История</h1></header>
       <div id="entries"></div>
     </section>
 
+    <!-- ===== НАПОМИНАНИЯ ===== -->
     <section id="reminders" class="screen">
       <header class="header"><h1>Напоминания</h1></header>
 
-      <div class="field">
-        <label>Сообщение</label>
-        <input type="text" id="reminderText" placeholder="Что напомнить?">
-      </div>
+      <div class="card">
+        <div class="seg" id="reminderMode">
+          <button class="seg-btn active" data-mode="once">Разовое</button>
+          <button class="seg-btn" data-mode="daily">Каждый день</button>
+        </div>
 
-      <div class="field">
-        <label>Когда</label>
-        <input type="datetime-local" id="reminderTime">
-      </div>
+        <div class="field">
+          <div class="label-row">
+            <label>Сообщение</label>
+            <button class="mic" data-target="reminderText" aria-label="Голос">🎤</button>
+          </div>
+          <input type="text" id="reminderText" placeholder="Что напомнить?">
+        </div>
 
-      <button id="addReminder" class="primary">Поставить</button>
+        <div class="field" id="dateField">
+          <label>Дата</label>
+          <input type="date" id="reminderDate">
+        </div>
+
+        <div class="field">
+          <label>Время</label>
+          <input type="time" id="reminderTime">
+        </div>
+
+        <button id="addReminder" class="primary">Поставить</button>
+      </div>
 
       <div class="divider"></div>
 
