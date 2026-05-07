@@ -1170,6 +1170,111 @@
   }
 
   // ===================================================================
+  //  OTA menu row (powered by @capgo/capacitor-updater via updater.js)
+  // ===================================================================
+  function escapeText(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  function ensureMenuVersionEl() {
+    const menu = $('menu');
+    if (!menu) return null;
+    let wrap = $('menuVersion');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'menuVersion';
+      wrap.className = 'menu-version';
+      menu.appendChild(wrap);
+    }
+    return wrap;
+  }
+
+  function renderForceResyncRow(wrap) {
+    const link = document.createElement('button');
+    link.className = 'menu-item';
+    link.style.opacity = '0.7';
+    link.style.fontSize = '13px';
+    link.textContent = 'Перепроверить · Пересобрать';
+    link.addEventListener('click', async () => {
+      link.disabled = true;
+      link.textContent = 'Скачиваю…';
+      try {
+        await window.OTA.forceResync();
+        // capgo .set() reloads the WebView, so we shouldn't reach here.
+      } catch (e) {
+        link.textContent = 'Ошибка — нет интернета';
+        setTimeout(() => renderOtaMenuRow(), 1500);
+      }
+    });
+    wrap.appendChild(link);
+  }
+
+  async function renderOtaMenuRow() {
+    if (!window.OTA) return;
+    const wrap = ensureMenuVersionEl();
+    if (!wrap) return;
+
+    let cur;
+    try { cur = await window.OTA.getCurrent(); }
+    catch (_) { cur = { bundle: { version: 'unknown' } }; }
+    const curVersion = (cur && cur.bundle && cur.bundle.version) || 'unknown';
+
+    let info;
+    try { info = await window.OTA.checkUpdate(); }
+    catch (_) { info = { available: false, currentVersion: curVersion, offline: true }; }
+
+    wrap.innerHTML = '';
+
+    if (info.available) {
+      const btn = document.createElement('button');
+      btn.className = 'menu-item menu-update';
+      btn.id = 'otaUpdateBtn';
+      btn.innerHTML =
+        '<span class="dot"></span>' +
+        '<span>' +
+          '<span class="menu-update-title">Доступно обновление</span>' +
+          '<span class="menu-version-sub">v' + escapeText(curVersion) +
+            ' → v' + escapeText(info.version) + '</span>' +
+        '</span>';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Скачиваю…</span>';
+        try {
+          await window.OTA.download_and_apply(info.url, info.version, info.code);
+          // capgo .set() reloads the WebView.
+        } catch (e) {
+          btn.innerHTML = '<span>Ошибка — проверь интернет</span>';
+          setTimeout(() => renderOtaMenuRow(), 1500);
+        }
+      });
+      wrap.appendChild(btn);
+    } else if (info.offline) {
+      const div = document.createElement('div');
+      div.className = 'menu-version-static';
+      div.innerHTML =
+        '<span class="menu-version-title">Версия v' + escapeText(curVersion) +
+          ' · оффлайн</span>';
+      wrap.appendChild(div);
+      renderForceResyncRow(wrap);
+    } else {
+      const div = document.createElement('div');
+      div.className = 'menu-version-static';
+      div.innerHTML =
+        '<span class="menu-version-title">Максимальная версия</span>' +
+        '<span class="menu-version-sub">v' + escapeText(curVersion) + '</span>';
+      wrap.appendChild(div);
+      renderForceResyncRow(wrap);
+    }
+  }
+
+  window.addEventListener('ota:ready', () => { renderOtaMenuRow(); });
+  // If updater.js already fired the event before app.js attached the
+  // listener (race on cold boot), schedule one render anyway.
+  if (window.OTA) setTimeout(renderOtaMenuRow, 0);
+
+  // ===================================================================
   //  INIT
   // ===================================================================
   loadToday();
