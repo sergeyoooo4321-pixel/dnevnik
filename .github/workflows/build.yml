@@ -35,6 +35,14 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Bump versionCode/versionName
+        working-directory: android/app
+        run: |
+          sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" build.gradle
+          sed -i "s/versionName .*/versionName \"1.0.${{ github.run_number }}\"/" build.gradle
+          echo "--- updated build.gradle ---"
+          grep -E "versionCode|versionName" build.gradle
+
       - name: Build debug APK
         working-directory: android
         run: |
