@@ -52,6 +52,12 @@ jobs:
           name: dnevnik-apk
           path: out/dnevnik.apk
 
+      - name: Delete previous "latest" release
+        if: github.ref == 'refs/heads/main'
+        run: gh release delete latest --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish to "latest" release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
