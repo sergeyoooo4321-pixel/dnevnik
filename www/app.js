@@ -71,6 +71,7 @@
     notes: 'Заметки',
     history: 'История',
     reminders: 'Напоминания',
+    plan: 'План',
   };
 
   const switchTab = (name) => {
@@ -86,6 +87,7 @@
     if (name === 'notes') renderNotes();
     if (name === 'reminders') renderReminders();
     if (name === 'today') loadToday();
+    if (name === 'plan') renderPlan();
   };
 
   const menuEl = $('menu');
@@ -223,6 +225,7 @@
     $('improve').value = entry?.improve || '';
     $('ratingValue').textContent = currentRating ? `${currentRating} / 10` : '—';
     renderStars(currentRating);
+    renderTodayPlan();
   };
 
   $('save').addEventListener('click', () => {
@@ -522,6 +525,559 @@
     $('reminderDate').min = dateKey();
     $('reminderTime').value = timeStr(next);
   };
+
+  // ===================================================================
+  //  ПЛАН (Subjects, schedule, themes, Pomodoro)
+  // ===================================================================
+  const FOCUS_MIN = 25;
+  const BREAK_MIN = 5;
+
+  const SUBJECT_COLORS = [
+    'var(--tag-think)',
+    'var(--tag-important)',
+    'var(--tag-idea)',
+    'var(--tag-task)',
+    'var(--tag-question)',
+    'var(--tag-default)',
+  ];
+
+  const WEEKDAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+  // Convert internal weekday (1=Mon..7=Sun) to Capacitor (1=Sun..7=Sat).
+  const toCapWeekday = (w) => (w === 7 ? 1 : w + 1);
+
+  // JS Date.getDay(): 0=Sun..6=Sat → internal 1=Mon..7=Sun
+  const internalWeekdayFromDate = (d) => {
+    const j = d.getDay();
+    return j === 0 ? 7 : j;
+  };
+
+  function hashId(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+
+  const slotNotifId = (subjectId, slot) =>
+    hashId(`plan|${subjectId}|${slot.weekday}|${slot.hour}|${slot.minute}`);
+
+  const newId = () => `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+
+  const getSubjects = () => {
+    try { return JSON.parse(localStorage.getItem('plan-subjects') || '[]'); }
+    catch (_) { return []; }
+  };
+  const saveSubjects = (list) =>
+    localStorage.setItem('plan-subjects', JSON.stringify(list));
+
+  async function scheduleSlotNotification(subject, slot) {
+    if (!LocalNotifications) return;
+    const granted = await ensureNotifPerm();
+    if (!granted) return;
+    const id = slotNotifId(subject.id, slot);
+    try {
+      // Cancel previous (if any) to avoid duplicates.
+      try { await LocalNotifications.cancel({ notifications: [{ id }] }); } catch (_) {}
+      await LocalNotifications.schedule({
+        notifications: [{
+          id,
+          title: `По плану: ${subject.name}`,
+          body: `Время заниматься. ${slot.durationMin} мин`,
+          schedule: {
+            on: {
+              weekday: toCapWeekday(slot.weekday),
+              hour: slot.hour,
+              minute: slot.minute,
+            },
+            allowWhileIdle: true,
+          },
+          smallIcon: 'ic_stat_icon_config_sample',
+        }],
+      });
+    } catch (e) {
+      console.error('slot schedule', e);
+    }
+  }
+
+  async function cancelSlotNotification(subjectId, slot) {
+    if (!LocalNotifications) return;
+    try {
+      await LocalNotifications.cancel({
+        notifications: [{ id: slotNotifId(subjectId, slot) }],
+      });
+    } catch (_) {}
+  }
+
+  async function cancelAllSubjectNotifications(subject) {
+    if (!subject?.schedule?.length) return;
+    for (const slot of subject.schedule) await cancelSlotNotification(subject.id, slot);
+  }
+
+  // ----- Render: subjects list -----
+  const expandedSubjects = new Set();
+
+  function renderPlan() {
+    const subjects = getSubjects();
+    const c = $('subjectsList');
+    if (!subjects.length) {
+      c.innerHTML = '<div class="empty">Предметов пока нет. Добавь первый.</div>';
+      return;
+    }
+
+    c.innerHTML = subjects.map((s) => {
+      const total = s.themes.length;
+      const done = s.themes.filter((t) => t.done).length;
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const expanded = expandedSubjects.has(s.id);
+      const slotsHtml = (s.schedule || []).map((sl, idx) =>
+        `<span class="slot-pill" data-subject="${s.id}" data-slot="${idx}">${WEEKDAY_LABELS[sl.weekday - 1]} ${pad(sl.hour)}:${pad(sl.minute)} · ${sl.durationMin}м<span class="slot-x" data-slot-del="${idx}" data-subject="${s.id}">×</span></span>`
+      ).join('');
+
+      const themesHtml = s.themes.map((t) => `
+        <div class="theme-row">
+          <input type="checkbox" class="theme-check" data-subject="${s.id}" data-theme="${t.id}" ${t.done ? 'checked' : ''}>
+          <span class="theme-text${t.done ? ' done' : ''}">${escape(t.text)}</span>
+          <button class="delete theme-del" data-subject="${s.id}" data-theme="${t.id}" aria-label="Удалить">×</button>
+        </div>
+      `).join('');
+
+      return `
+        <div class="subject-card" data-subject="${s.id}">
+          <div class="subject-head" data-subject-toggle="${s.id}">
+            <span class="color-dot" style="background:${s.color}"></span>
+            <div class="subject-name">${escape(s.name)}</div>
+            <div class="subject-progress-text">${done} / ${total}</div>
+          </div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${s.color}"></div></div>
+          <div class="subject-actions">
+            <button class="ghost subject-pomodoro" data-subject="${s.id}">Начать сессию</button>
+          </div>
+
+          ${expanded ? `
+            <div class="subject-section">
+              <label class="section-label">Темы</label>
+              <div class="themes-list">${themesHtml || '<div class="muted-line">Тем нет.</div>'}</div>
+              <div class="theme-add-row">
+                <input type="text" class="theme-input" id="themeInput-${s.id}" placeholder="Новая тема">
+                <button class="mic theme-mic" data-target="themeInput-${s.id}" aria-label="Голос">🎤</button>
+                <button class="ghost theme-add" data-subject="${s.id}">Добавить</button>
+              </div>
+              <div class="field" style="margin-top:10px;">
+                <label>Темы пачкой (по одной на строку)</label>
+                <textarea id="themeBulk-${s.id}" placeholder="Тема 1&#10;Тема 2&#10;…"></textarea>
+                <button class="ghost theme-bulk" data-subject="${s.id}" style="margin-top:6px;">Добавить пачкой</button>
+              </div>
+            </div>
+
+            <div class="subject-section">
+              <label class="section-label">Расписание</label>
+              <div class="slots-row">${slotsHtml || '<span class="muted-line">Слотов нет.</span>'}</div>
+              <div class="slot-add">
+                <div class="weekday-row" data-subject="${s.id}"></div>
+                <div class="slot-add-row">
+                  <input type="time" class="slot-time" id="slotTime-${s.id}" value="18:00">
+                  <input type="number" class="slot-dur" id="slotDur-${s.id}" min="5" max="240" value="60">
+                  <span class="muted-line">мин</span>
+                  <button class="ghost slot-add-btn" data-subject="${s.id}">Добавить</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="subject-section subject-danger">
+              <button class="ghost danger subject-delete" data-subject="${s.id}">Удалить предмет</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Wire toggles
+    c.querySelectorAll('[data-subject-toggle]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = el.dataset.subjectToggle;
+        if (expandedSubjects.has(id)) expandedSubjects.delete(id);
+        else expandedSubjects.add(id);
+        renderPlan();
+      });
+    });
+
+    // Pomodoro start
+    c.querySelectorAll('.subject-pomodoro').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        startPomodoro(b.dataset.subject);
+      });
+    });
+
+    // Theme checkbox
+    c.querySelectorAll('.theme-check').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const list = getSubjects();
+        const subj = list.find((x) => x.id === cb.dataset.subject);
+        if (!subj) return;
+        const th = subj.themes.find((x) => x.id === cb.dataset.theme);
+        if (!th) return;
+        th.done = cb.checked;
+        saveSubjects(list);
+        renderPlan();
+      });
+    });
+
+    // Theme delete
+    c.querySelectorAll('.theme-del').forEach((b) => {
+      b.addEventListener('click', () => {
+        const list = getSubjects();
+        const subj = list.find((x) => x.id === b.dataset.subject);
+        if (!subj) return;
+        subj.themes = subj.themes.filter((x) => x.id !== b.dataset.theme);
+        saveSubjects(list);
+        renderPlan();
+      });
+    });
+
+    // Theme add (single)
+    c.querySelectorAll('.theme-add').forEach((b) => {
+      b.addEventListener('click', () => {
+        const sid = b.dataset.subject;
+        const input = $('themeInput-' + sid);
+        const txt = (input?.value || '').trim();
+        if (!txt) { toast('Введи тему'); return; }
+        const list = getSubjects();
+        const subj = list.find((x) => x.id === sid);
+        if (!subj) return;
+        if (!subj.themes.some((t) => t.text.toLowerCase() === txt.toLowerCase())) {
+          subj.themes.push({ id: newId(), text: txt, done: false });
+        }
+        saveSubjects(list);
+        renderPlan();
+      });
+    });
+
+    // Theme bulk add
+    c.querySelectorAll('.theme-bulk').forEach((b) => {
+      b.addEventListener('click', () => {
+        const sid = b.dataset.subject;
+        const ta = $('themeBulk-' + sid);
+        const lines = (ta?.value || '').split('\n').map((s) => s.trim()).filter(Boolean);
+        if (!lines.length) { toast('Список пуст'); return; }
+        const list = getSubjects();
+        const subj = list.find((x) => x.id === sid);
+        if (!subj) return;
+        const seen = new Set(subj.themes.map((t) => t.text.toLowerCase()));
+        let added = 0;
+        for (const ln of lines) {
+          const k = ln.toLowerCase();
+          if (seen.has(k)) continue;
+          seen.add(k);
+          subj.themes.push({ id: newId(), text: ln, done: false });
+          added++;
+        }
+        saveSubjects(list);
+        toast(`Добавлено: ${added}`);
+        renderPlan();
+      });
+    });
+
+    // Theme mic
+    c.querySelectorAll('.theme-mic').forEach((btn) =>
+      btn.addEventListener('click', () => voiceInput(btn.dataset.target, btn))
+    );
+
+    // Slot delete
+    c.querySelectorAll('[data-slot-del]').forEach((x) => {
+      x.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const sid = x.dataset.subject;
+        const idx = parseInt(x.dataset.slotDel, 10);
+        const list = getSubjects();
+        const subj = list.find((s) => s.id === sid);
+        if (!subj) return;
+        const slot = subj.schedule[idx];
+        if (!slot) return;
+        await cancelSlotNotification(sid, slot);
+        subj.schedule.splice(idx, 1);
+        saveSubjects(list);
+        renderPlan();
+      });
+    });
+
+    // Weekday chips for each open subject
+    c.querySelectorAll('.weekday-row').forEach((row) => {
+      const sid = row.dataset.subject;
+      WEEKDAY_LABELS.forEach((lbl, i) => {
+        const chip = document.createElement('button');
+        chip.className = 'tag-chip weekday-chip';
+        chip.dataset.subject = sid;
+        chip.dataset.weekday = String(i + 1);
+        chip.textContent = lbl;
+        chip.addEventListener('click', () => chip.classList.toggle('active'));
+        row.appendChild(chip);
+      });
+    });
+
+    // Slot add
+    c.querySelectorAll('.slot-add-btn').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const sid = b.dataset.subject;
+        const card = b.closest('.subject-card');
+        const days = Array.from(card.querySelectorAll('.weekday-chip.active'))
+          .map((ch) => parseInt(ch.dataset.weekday, 10));
+        const time = $('slotTime-' + sid)?.value;
+        const dur = parseInt($('slotDur-' + sid)?.value || '60', 10);
+        if (!days.length) { toast('Выбери хотя бы один день'); return; }
+        if (!time) { toast('Укажи время'); return; }
+        if (!Number.isFinite(dur) || dur <= 0) { toast('Кривая длительность'); return; }
+        const [hh, mm] = time.split(':').map(Number);
+        const list = getSubjects();
+        const subj = list.find((s) => s.id === sid);
+        if (!subj) return;
+        for (const w of days) {
+          const exists = subj.schedule.some(
+            (sl) => sl.weekday === w && sl.hour === hh && sl.minute === mm
+          );
+          if (exists) continue;
+          const slot = { weekday: w, hour: hh, minute: mm, durationMin: dur };
+          subj.schedule.push(slot);
+          await scheduleSlotNotification(subj, slot);
+        }
+        saveSubjects(list);
+        toast('Слот(ы) добавлены');
+        renderPlan();
+      });
+    });
+
+    // Subject delete
+    c.querySelectorAll('.subject-delete').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const sid = b.dataset.subject;
+        const list = getSubjects();
+        const subj = list.find((s) => s.id === sid);
+        if (!subj) return;
+        if (!confirm(`Удалить предмет «${subj.name}» и всё его расписание?`)) return;
+        await cancelAllSubjectNotifications(subj);
+        saveSubjects(list.filter((s) => s.id !== sid));
+        expandedSubjects.delete(sid);
+        renderPlan();
+      });
+    });
+  }
+
+  // ----- New subject form -----
+  let newSubjectColor = SUBJECT_COLORS[0];
+
+  function renderNewSubjectColors() {
+    const c = $('newSubjectColor');
+    c.innerHTML = '';
+    SUBJECT_COLORS.forEach((col) => {
+      const dot = document.createElement('button');
+      dot.className = 'color-dot color-pick' + (col === newSubjectColor ? ' active' : '');
+      dot.style.background = col;
+      dot.addEventListener('click', () => {
+        newSubjectColor = col;
+        renderNewSubjectColors();
+      });
+      c.appendChild(dot);
+    });
+  }
+
+  $('newSubjectBtn').addEventListener('click', () => {
+    const f = $('newSubjectForm');
+    f.hidden = !f.hidden;
+    if (!f.hidden) {
+      $('newSubjectName').value = '';
+      newSubjectColor = SUBJECT_COLORS[0];
+      renderNewSubjectColors();
+      setTimeout(() => $('newSubjectName').focus(), 0);
+    }
+  });
+  $('newSubjectCancel').addEventListener('click', () => { $('newSubjectForm').hidden = true; });
+  $('newSubjectSave').addEventListener('click', () => {
+    const name = $('newSubjectName').value.trim();
+    if (!name) { toast('Имя предмета обязательно'); return; }
+    const list = getSubjects();
+    list.push({
+      id: newId(),
+      name,
+      color: newSubjectColor,
+      themes: [],
+      schedule: [],
+    });
+    saveSubjects(list);
+    $('newSubjectForm').hidden = true;
+    toast('Предмет создан');
+    renderPlan();
+  });
+
+  // ===================================================================
+  //  Pomodoro
+  // ===================================================================
+  let pomoState = {
+    active: false,
+    subjectId: null,
+    phase: 'focus', // 'focus' | 'break'
+    remaining: FOCUS_MIN * 60,
+    paused: false,
+    cycles: 0, // completed focus phases
+    timer: null,
+  };
+
+  function pomoFmt(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${pad(m)}:${pad(s)}`;
+  }
+
+  function pomoUpdateUI() {
+    $('pomodoroTime').textContent = pomoFmt(pomoState.remaining);
+    $('pomodoroPhase').textContent = pomoState.phase === 'focus' ? 'Учим' : 'Отдых';
+    $('pomodoroCycles').textContent = `Циклов: ${pomoState.cycles}`;
+    $('pomodoroPause').textContent = pomoState.paused ? 'Продолжить' : 'Пауза';
+  }
+
+  function pomoTick() {
+    if (!pomoState.active || pomoState.paused) return;
+    pomoState.remaining -= 1;
+    if (pomoState.remaining <= 0) {
+      pomoNextPhase(true);
+    } else {
+      $('pomodoroTime').textContent = pomoFmt(pomoState.remaining);
+    }
+  }
+
+  async function pomoNotify(title, body) {
+    try { navigator.vibrate?.([200, 100, 200]); } catch (_) {}
+    if (!LocalNotifications) return;
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: hashId('pomo|' + Date.now() + Math.random()),
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 50), allowWhileIdle: true },
+          smallIcon: 'ic_stat_icon_config_sample',
+        }],
+      });
+    } catch (_) {}
+  }
+
+  function pomoNextPhase(natural) {
+    if (pomoState.phase === 'focus') {
+      if (natural) {
+        pomoState.cycles += 1;
+        // Increment today's counter for this subject.
+        if (pomoState.subjectId) {
+          const k = `pomodoro-${pomoState.subjectId}-${dateKey()}`;
+          const cur = parseInt(localStorage.getItem(k) || '0', 10) || 0;
+          localStorage.setItem(k, String(cur + 1));
+        }
+        pomoNotify('Pomodoro', `Перерыв ${BREAK_MIN} мин`);
+      }
+      pomoState.phase = 'break';
+      pomoState.remaining = BREAK_MIN * 60;
+    } else {
+      if (natural) pomoNotify('Pomodoro', `Снова в бой! ${FOCUS_MIN} мин`);
+      pomoState.phase = 'focus';
+      pomoState.remaining = FOCUS_MIN * 60;
+    }
+    pomoUpdateUI();
+  }
+
+  function startPomodoro(subjectId) {
+    const subj = getSubjects().find((s) => s.id === subjectId);
+    if (!subj) return;
+    // If already active for another subject, ask first.
+    if (pomoState.active && pomoState.subjectId !== subjectId) {
+      if (!confirm('Идёт другая сессия. Прервать и начать новую?')) return;
+      stopPomodoro(false);
+    }
+    pomoState.active = true;
+    pomoState.subjectId = subjectId;
+    pomoState.phase = 'focus';
+    pomoState.remaining = FOCUS_MIN * 60;
+    pomoState.paused = false;
+    pomoState.cycles = 0;
+    if (pomoState.timer) clearInterval(pomoState.timer);
+    pomoState.timer = setInterval(pomoTick, 1000);
+    $('pomodoroSubject').textContent = subj.name;
+    pomoUpdateUI();
+    $('pomodoroOverlay').hidden = false;
+  }
+
+  function stopPomodoro(closeUi) {
+    if (pomoState.timer) clearInterval(pomoState.timer);
+    pomoState.timer = null;
+    pomoState.active = false;
+    pomoState.paused = false;
+    if (closeUi !== false) $('pomodoroOverlay').hidden = true;
+  }
+
+  $('pomodoroPause').addEventListener('click', () => {
+    if (!pomoState.active) return;
+    pomoState.paused = !pomoState.paused;
+    pomoUpdateUI();
+  });
+  $('pomodoroSkip').addEventListener('click', () => {
+    if (!pomoState.active) return;
+    pomoNextPhase(false);
+  });
+  $('pomodoroStop').addEventListener('click', () => {
+    stopPomodoro(true);
+    toast('Сессия завершена');
+    renderTodayPlan();
+  });
+
+  // ===================================================================
+  //  Today plan widget on День
+  // ===================================================================
+  function renderTodayPlan() {
+    const c = $('todayPlan');
+    if (!c) return;
+    const subjects = getSubjects();
+    const today = internalWeekdayFromDate(new Date());
+    const items = [];
+    for (const s of subjects) {
+      const slots = (s.schedule || []).filter((sl) => sl.weekday === today);
+      for (const sl of slots) items.push({ subject: s, slot: sl });
+    }
+    items.sort((a, b) =>
+      (a.slot.hour * 60 + a.slot.minute) - (b.slot.hour * 60 + b.slot.minute)
+    );
+
+    if (!subjects.length) {
+      c.innerHTML = '';
+      return;
+    }
+
+    if (!items.length) {
+      c.innerHTML = `
+        <div class="today-plan">
+          <div class="today-plan-head">По плану сегодня</div>
+          <div class="muted-line">Сегодня свободный день.</div>
+        </div>`;
+      return;
+    }
+
+    c.innerHTML = `
+      <div class="today-plan">
+        <div class="today-plan-head">По плану сегодня</div>
+        ${items.map(({ subject, slot }) => {
+          const next = subject.themes.find((t) => !t.done);
+          return `
+            <div class="today-plan-row">
+              <span class="color-dot" style="background:${subject.color}"></span>
+              <div class="today-plan-info">
+                <div class="today-plan-name">${escape(subject.name)}</div>
+                <div class="today-plan-meta">${pad(slot.hour)}:${pad(slot.minute)} · ${slot.durationMin}м${next ? ' · ' + escape(next.text) : ''}</div>
+              </div>
+              <button class="ghost today-plan-go" data-subject="${subject.id}">Начать</button>
+            </div>`;
+        }).join('')}
+      </div>`;
+
+    c.querySelectorAll('.today-plan-go').forEach((b) =>
+      b.addEventListener('click', () => startPomodoro(b.dataset.subject))
+    );
+  }
 
   // ===================================================================
   //  INIT

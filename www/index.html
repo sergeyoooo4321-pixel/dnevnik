@@ -24,6 +24,7 @@
       <button class="menu-item" role="menuitem" data-tab="notes">Заметки</button>
       <button class="menu-item" role="menuitem" data-tab="history">История</button>
       <button class="menu-item" role="menuitem" data-tab="reminders">Напоминания</button>
+      <button class="menu-item" role="menuitem" data-tab="plan">План</button>
     </div>
   </header>
 
@@ -31,6 +32,8 @@
     <!-- ===== СЕГОДНЯ ===== -->
     <section id="today" class="screen active">
       <div class="subtitle" id="todayDate"></div>
+
+      <div id="todayPlan"></div>
 
       <div class="field">
         <label>Оценка дня</label>
@@ -124,7 +127,44 @@
 
       <div id="remindersList"></div>
     </section>
+
+    <!-- ===== ПЛАН ===== -->
+    <section id="plan" class="screen">
+      <button id="newSubjectBtn" class="primary">+ Новый предмет</button>
+
+      <div id="newSubjectForm" class="card" hidden style="margin-top:12px;">
+        <div class="field">
+          <label>Название</label>
+          <input type="text" id="newSubjectName" placeholder="Математика, физика…">
+        </div>
+        <div class="field">
+          <label>Цвет</label>
+          <div class="color-picker" id="newSubjectColor"></div>
+        </div>
+        <div class="plan-form-actions">
+          <button id="newSubjectCancel" class="ghost">Отмена</button>
+          <button id="newSubjectSave" class="primary">Создать</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="subjectsList"></div>
+    </section>
   </main>
+
+  <!-- Pomodoro overlay -->
+  <div id="pomodoroOverlay" class="pomodoro-overlay" hidden>
+    <div class="pomodoro-subject" id="pomodoroSubject"></div>
+    <div class="pomodoro-phase" id="pomodoroPhase">Учим</div>
+    <div class="pomodoro-time" id="pomodoroTime">25:00</div>
+    <div class="pomodoro-cycles" id="pomodoroCycles">Циклов: 0</div>
+    <div class="pomodoro-actions">
+      <button class="ghost" id="pomodoroPause">Пауза</button>
+      <button class="ghost" id="pomodoroSkip">Пропустить</button>
+      <button class="primary" id="pomodoroStop">Стоп</button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
