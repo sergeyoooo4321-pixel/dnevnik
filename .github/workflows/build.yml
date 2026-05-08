@@ -35,6 +35,17 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Harden AndroidManifest (allowBackup=false)
+        working-directory: android/app/src/main
+        run: |
+          # Запрещаем adb backup, чтобы дневник нельзя было слить с устройства.
+          if grep -q 'android:allowBackup' AndroidManifest.xml; then
+            sed -i 's/android:allowBackup="[^"]*"/android:allowBackup="false"/' AndroidManifest.xml
+          else
+            sed -i 's|<application |<application android:allowBackup="false" |' AndroidManifest.xml
+          fi
+          grep -E "allowBackup|application " AndroidManifest.xml | head -3
+
       - name: Compute version
         id: ver
         run: |
@@ -67,10 +78,14 @@ jobs:
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/dnevnik.apk
           cd www && zip -r ../out/www.zip . && cd ..
+          # SHA-256 от www.zip — Capgo сверит после скачки и отвергнет
+          # битый/подменённый бандл (защита целостности OTA).
+          CHECKSUM=$(sha256sum out/www.zip | awk '{print $1}')
           cat > out/manifest.json <<EOF
           {
             "version": "${{ steps.ver.outputs.ota_version }}",
-            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip"
+            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip",
+            "checksum": "${CHECKSUM}"
           }
           EOF
           echo "--- manifest ---"

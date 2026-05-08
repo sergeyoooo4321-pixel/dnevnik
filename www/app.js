@@ -1279,7 +1279,7 @@
     wrap.appendChild(status);
 
     try {
-      await window.OTA.applyUpdate(info.url, info.latestVersion, (percent) => {
+      await window.OTA.applyUpdate(info.url, info.latestVersion, info.checksum, (percent) => {
         const el = $('otaProgress');
         if (el) el.textContent = Math.round(percent) + '%';
       });

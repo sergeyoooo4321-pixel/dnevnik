@@ -45,6 +45,7 @@
       if (!data || typeof data.version !== 'string' || typeof data.url !== 'string') {
         return null;
       }
+      // checksum опционален — если есть, передадим в Capgo для валидации SHA-256.
       return data;
     }).catch(function () { return null; });
   }
@@ -62,7 +63,7 @@
     });
   }
 
-  // { available: bool, currentVersion, latestVersion?, url?, offline? }
+  // { available: bool, currentVersion, latestVersion?, url?, checksum?, offline? }
   function checkUpdate() {
     return Promise.all([fetchManifest(), getCurrent()]).then(function (r) {
       var manifest = r[0];
@@ -77,13 +78,16 @@
         currentVersion: currentVersion,
         latestVersion: manifest.version,
         url: manifest.url,
+        checksum: typeof manifest.checksum === 'string' ? manifest.checksum : null,
       };
     });
   }
 
   // Скачать бандл по url и переключиться на него (Capgo сам перезагрузит WebView).
+  // checksum (SHA-256 hex от zip) опционален — если задан, Capgo сам сверит и
+  // отвергнет битый/подменённый бандл.
   // onProgress(percent) — опциональный колбэк прогресса.
-  function applyUpdate(url, version, onProgress) {
+  function applyUpdate(url, version, checksum, onProgress) {
     var U = updater();
     if (!U) return Promise.reject(new Error('CapacitorUpdater недоступен'));
 
@@ -99,7 +103,10 @@
       }
     };
 
-    return U.download({ version: version, url: url })
+    var dlOpts = { version: version, url: url };
+    if (typeof checksum === 'string' && checksum) dlOpts.checksum = checksum;
+
+    return U.download(dlOpts)
       .then(function (bundle) {
         return U.set({ id: bundle.id });
       })
