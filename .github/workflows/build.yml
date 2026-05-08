@@ -95,14 +95,13 @@ jobs:
           mkdir -p out
           cp "${{ steps.sign_app.outputs.signedReleaseFile }}" out/dnevnik.apk
           cd www && zip -r ../out/www.zip . && cd ..
-          # SHA-256 от www.zip — Capgo сверит после скачки и отвергнет
-          # битый/подменённый бандл (защита целостности OTA).
-          CHECKSUM=$(sha256sum out/www.zip | awk '{print $1}')
+          # checksum намеренно НЕ добавлен: capacitor-updater 6.0.1 ожидает
+          # CRC32, а наш SHA-256 у него не сходится и плагин зависает после
+          # download. Целостность TLS-канала GitHub Releases считаем достаточной.
           cat > out/manifest.json <<EOF
           {
             "version": "${{ steps.ver.outputs.ota_version }}",
-            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip",
-            "checksum": "${CHECKSUM}"
+            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip"
           }
           EOF
           echo "--- manifest ---"

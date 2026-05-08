@@ -151,6 +151,21 @@
           <button id="importDoBtn2" class="primary" style="margin-top:8px;">Импортировать</button>
         </div>
       </div>
+
+      <div class="divider"></div>
+
+      <div class="card">
+        <div class="field">
+          <label>Лог обновлений (OTA)</label>
+          <div class="subtitle">Что происходит при проверке/скачивании обновлений. Если что-то идёт не так — здесь будет видно почему.</div>
+          <textarea id="otaLogText" readonly placeholder="Нажми «Показать»…" style="min-height:200px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px;">
+            <button id="otaLogShowBtn" class="ghost">Показать</button>
+            <button id="otaLogCopyBtn" class="ghost">Скопировать</button>
+            <button id="otaLogClearBtn" class="ghost danger">Очистить</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== ГРАФИК ===== -->

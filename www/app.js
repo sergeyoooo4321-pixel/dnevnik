@@ -771,6 +771,38 @@
     }
   });
 
+  // ---- OTA log viewer ----
+  function formatOtaLog() {
+    const log = window.OTA && window.OTA.getLog ? window.OTA.getLog() : [];
+    if (!log.length) return '(пусто)';
+    return log.map((e) => {
+      const t = new Date(e.t).toLocaleTimeString('ru-RU');
+      const dataStr = e.data ? ' ' + JSON.stringify(e.data) : '';
+      return `[${t}] ${e.msg}${dataStr}`;
+    }).join('\n');
+  }
+  $('otaLogShowBtn').addEventListener('click', () => {
+    $('otaLogText').value = formatOtaLog();
+  });
+  $('otaLogCopyBtn').addEventListener('click', async () => {
+    const text = formatOtaLog();
+    $('otaLogText').value = text;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Лог скопирован');
+    } catch (_) {
+      $('otaLogText').focus();
+      $('otaLogText').select();
+      toast('Выдели и скопируй вручную');
+    }
+  });
+  $('otaLogClearBtn').addEventListener('click', () => {
+    if (!confirm('Очистить лог?')) return;
+    if (window.OTA && window.OTA.clearLog) window.OTA.clearLog();
+    $('otaLogText').value = '(пусто)';
+    toast('Очищено');
+  });
+
   $('importDoBtn2').addEventListener('click', () => {
     const text = $('importText').value.trim();
     if (!text) { toast('Сначала вставь JSON'); return; }
@@ -896,7 +928,7 @@
     wrap.appendChild(status);
 
     try {
-      await window.OTA.applyUpdate(info.url, info.latestVersion, info.checksum, (percent) => {
+      await window.OTA.applyUpdate(info.url, info.latestVersion, (percent) => {
         const el = $('otaProgress');
         if (el) el.textContent = Math.round(percent) + '%';
       });
