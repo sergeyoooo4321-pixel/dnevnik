@@ -9,3 +9,8 @@ build/
 .idea/
 *.iml
 local.properties
+
+# Локальные секреты разработчика (keystore, пароли). НИКОГДА не коммитить.
+.local-secrets/
+*.jks
+*.keystore
