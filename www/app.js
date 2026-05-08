@@ -141,7 +141,7 @@
 
   document.querySelectorAll('.menu-item').forEach((item) =>
     item.addEventListener('click', () => {
-      switchTab(item.dataset.tab);
+      if (item.dataset.tab) switchTab(item.dataset.tab);
       closeMenu();
     })
   );
@@ -771,38 +771,6 @@
     }
   });
 
-  // ---- OTA log viewer ----
-  function formatOtaLog() {
-    const log = window.OTA && window.OTA.getLog ? window.OTA.getLog() : [];
-    if (!log.length) return '(пусто)';
-    return log.map((e) => {
-      const t = new Date(e.t).toLocaleTimeString('ru-RU');
-      const dataStr = e.data ? ' ' + JSON.stringify(e.data) : '';
-      return `[${t}] ${e.msg}${dataStr}`;
-    }).join('\n');
-  }
-  $('otaLogShowBtn').addEventListener('click', () => {
-    $('otaLogText').value = formatOtaLog();
-  });
-  $('otaLogCopyBtn').addEventListener('click', async () => {
-    const text = formatOtaLog();
-    $('otaLogText').value = text;
-    try {
-      await navigator.clipboard.writeText(text);
-      toast('Лог скопирован');
-    } catch (_) {
-      $('otaLogText').focus();
-      $('otaLogText').select();
-      toast('Выдели и скопируй вручную');
-    }
-  });
-  $('otaLogClearBtn').addEventListener('click', () => {
-    if (!confirm('Очистить лог?')) return;
-    if (window.OTA && window.OTA.clearLog) window.OTA.clearLog();
-    $('otaLogText').value = '(пусто)';
-    toast('Очищено');
-  });
-
   $('importDoBtn2').addEventListener('click', () => {
     const text = $('importText').value.trim();
     if (!text) { toast('Сначала вставь JSON'); return; }
@@ -818,151 +786,43 @@
     }
   });
 
+
   // ===================================================================
-  //  OTA menu row (powered by @capgo/capacitor-updater via updater.js)
+  //  ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ — сравнить SHA коммита и открыть APK в браузере
   // ===================================================================
-  function escapeText(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    }[c]));
-  }
+  const REPO = 'sergeyoooo4321-pixel/dnevnik';
+  const APK_URL = `https://github.com/${REPO}/releases/download/latest/dnevnik.apk`;
 
-  function ensureMenuVersionEl() {
-    const menu = $('menu');
-    if (!menu) return null;
-    let wrap = $('menuVersion');
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'menuVersion';
-      wrap.className = 'menu-version';
-      menu.appendChild(wrap);
-    }
-    return wrap;
-  }
-
-  // Одна кнопка с тремя состояниями: idle → checking → (update | uptodate | offline) → applying.
-  // По тапу: idle → проверка; если есть обновление — рендер «Обновить до vX»; ещё тап — скачивание.
-  let otaState = 'idle';
-
-  function renderOtaIdle(wrap, currentVersion) {
-    wrap.innerHTML = '';
-    const div = document.createElement('div');
-    div.className = 'menu-version-static';
-    div.innerHTML =
-      '<span class="menu-version-title">Версия v' + escapeText(currentVersion) + '</span>';
-    wrap.appendChild(div);
-
-    const btn = document.createElement('button');
-    btn.className = 'menu-item';
-    btn.textContent = 'Проверить обновления';
-    btn.addEventListener('click', () => doCheck(wrap));
-    wrap.appendChild(btn);
-  }
-
-  async function doCheck(wrap) {
-    if (otaState !== 'idle') return;
-    otaState = 'checking';
-    wrap.innerHTML =
-      '<div class="menu-version-static">' +
-        '<span class="menu-version-title">Проверяю…</span>' +
-      '</div>';
-
-    let info;
-    try { info = await window.OTA.checkUpdate(); }
-    catch (_) { info = { available: false, offline: true, currentVersion: 'unknown' }; }
-
-    otaState = 'idle';
-    renderOtaResult(wrap, info);
-  }
-
-  function renderOtaResult(wrap, info) {
-    wrap.innerHTML = '';
-    const cur = info.currentVersion || 'unknown';
-
-    if (info.available) {
-      const btn = document.createElement('button');
-      btn.className = 'menu-item menu-update';
-      btn.innerHTML =
-        '<span class="dot"></span>' +
-        '<span>' +
-          '<span class="menu-update-title">Обновить до v' + escapeText(info.latestVersion) + '</span>' +
-          '<span class="menu-version-sub">сейчас v' + escapeText(cur) + '</span>' +
-        '</span>';
-      btn.addEventListener('click', () => doApply(wrap, info));
-      wrap.appendChild(btn);
-      return;
-    }
-
-    const div = document.createElement('div');
-    div.className = 'menu-version-static';
-    if (info.offline) {
-      div.innerHTML =
-        '<span class="menu-version-title">Нет интернета</span>' +
-        '<span class="menu-version-sub">v' + escapeText(cur) + '</span>';
-    } else {
-      div.innerHTML =
-        '<span class="menu-version-title">Уже последняя версия</span>' +
-        '<span class="menu-version-sub">v' + escapeText(cur) + '</span>';
-    }
-    wrap.appendChild(div);
-
-    const again = document.createElement('button');
-    again.className = 'menu-item';
-    again.style.opacity = '0.7';
-    again.style.fontSize = '13px';
-    again.textContent = 'Проверить ещё раз';
-    again.addEventListener('click', () => doCheck(wrap));
-    wrap.appendChild(again);
-  }
-
-  async function doApply(wrap, info) {
-    if (otaState !== 'idle') return;
-    otaState = 'applying';
-
-    const status = document.createElement('div');
-    status.className = 'menu-version-static';
-    status.innerHTML =
-      '<span class="menu-version-title">Скачиваю…</span>' +
-      '<span class="menu-version-sub" id="otaProgress">0%</span>';
-    wrap.innerHTML = '';
-    wrap.appendChild(status);
-
+  async function checkForUpdate() {
+    const btn = document.getElementById('update-btn');
+    if (!btn) return;
+    btn.textContent = 'Проверяю';
+    btn.disabled = true;
     try {
-      await window.OTA.applyUpdate(info.url, info.latestVersion, (percent) => {
-        const el = $('otaProgress');
-        if (el) el.textContent = Math.round(percent) + '%';
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        headers: { 'Accept': 'application/vnd.github+json' },
       });
-      // Capgo set() сам перезагружает WebView — сюда обычно не доходим.
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const remoteSha = (data.body || '').trim().split(/\s+/)[0];
+      if (remoteSha && remoteSha === window.BUILD_SHA) {
+        btn.textContent = 'Актуальная версия';
+        await new Promise((r) => setTimeout(r, 2000));
+        return;
+      }
+      if (confirm('Доступна новая версия. Скачать APK?')) {
+        window.open(APK_URL, '_system');
+      }
     } catch (e) {
-      otaState = 'idle';
-      wrap.innerHTML =
-        '<div class="menu-version-static">' +
-          '<span class="menu-version-title">Ошибка обновления</span>' +
-          '<span class="menu-version-sub">' + escapeText(e && e.message ? e.message : 'неизвестная') + '</span>' +
-        '</div>';
-      const retry = document.createElement('button');
-      retry.className = 'menu-item';
-      retry.textContent = 'Попробовать снова';
-      retry.addEventListener('click', () => doCheck(wrap));
-      wrap.appendChild(retry);
+      alert('Не удалось проверить обновление: ' + (e && e.message ? e.message : e));
+    } finally {
+      btn.textContent = 'Обновить';
+      btn.disabled = false;
     }
   }
 
-  async function renderOtaMenuRow() {
-    if (!window.OTA) return;
-    const wrap = ensureMenuVersionEl();
-    if (!wrap) return;
-
-    let cur;
-    try { cur = await window.OTA.getCurrent(); }
-    catch (_) { cur = { bundle: { version: 'unknown' } }; }
-    const curVersion = (cur && cur.bundle && cur.bundle.version) || 'unknown';
-
-    renderOtaIdle(wrap, curVersion);
-  }
-
-  window.addEventListener('ota:ready', () => { renderOtaMenuRow(); });
-  if (window.OTA) setTimeout(renderOtaMenuRow, 0);
+  const updateBtn = document.getElementById('update-btn');
+  if (updateBtn) updateBtn.addEventListener('click', checkForUpdate);
 
   // ===================================================================
   //  INIT

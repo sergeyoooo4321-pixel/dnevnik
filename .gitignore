@@ -14,3 +14,6 @@ local.properties
 .local-secrets/
 *.jks
 *.keystore
+
+# Генерится в CI (Inject build info шаг). Локально лежит как stub.
+www/build-info.js

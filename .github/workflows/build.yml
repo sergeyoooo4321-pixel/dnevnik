@@ -29,6 +29,14 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Inject build info
+        run: |
+          cat > www/build-info.js <<EOF
+          window.BUILD_SHA = "${{ github.sha }}";
+          window.BUILD_TIME = "$(date -u +%Y-%m-%dT%H:%M:%SZ)";
+          EOF
+          cat www/build-info.js
+
       - name: Add Android platform
         run: npx cap add android
 
@@ -107,18 +115,6 @@ jobs:
         run: |
           mkdir -p out
           cp "${{ steps.sign_app.outputs.signedReleaseFile }}" out/dnevnik.apk
-          cd www && zip -r ../out/www.zip . && cd ..
-          # checksum намеренно НЕ добавлен: capacitor-updater 6.0.1 ожидает
-          # CRC32, а наш SHA-256 у него не сходится и плагин зависает после
-          # download. Целостность TLS-канала GitHub Releases считаем достаточной.
-          cat > out/manifest.json <<EOF
-          {
-            "version": "${{ steps.ver.outputs.ota_version }}",
-            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip"
-          }
-          EOF
-          echo "--- manifest ---"
-          cat out/manifest.json
           ls -la out/
 
       - name: Upload artifact
@@ -140,6 +136,8 @@ jobs:
           tag_name: latest
           name: Latest build
           body: |
+            ${{ github.sha }}
+
             Свежая сборка дневника. Версия: ${{ steps.ver.outputs.ota_version }}
 
             **Первичная установка на Samsung:**
@@ -147,13 +145,11 @@ jobs:
             2. Открой файл на телефоне → разреши установку из этого источника.
             3. Установи.
 
-            **Дальше — обновляйся прямо в приложении**: три точки → «Проверить обновления» → «Обновить до vX». APK переустанавливать не надо.
+            **Дальше — кнопка «Обновить» в приложении** (три точки → Обновить) сравнит SHA коммита с текущей сборкой и предложит скачать новый APK.
 
             Если не приходят уведомления — отключи оптимизацию батареи для приложения «Дневник».
           files: |
             out/dnevnik.apk
-            out/www.zip
-            out/manifest.json
           make_latest: 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
