@@ -24,7 +24,7 @@
       <button class="menu-item" role="menuitem" data-tab="notes">Заметки</button>
       <button class="menu-item" role="menuitem" data-tab="history">История</button>
       <button class="menu-item" role="menuitem" data-tab="reminders">Напоминания</button>
-      <button class="menu-item" role="menuitem" data-tab="plan">План</button>
+      <button class="menu-item" role="menuitem" data-tab="plan">График</button>
       <button class="menu-item" role="menuitem" data-tab="data">Данные</button>
     </div>
   </header>
@@ -33,8 +33,6 @@
     <!-- ===== СЕГОДНЯ ===== -->
     <section id="today" class="screen active">
       <div class="subtitle" id="todayDate"></div>
-
-      <div id="todayCourses"></div>
 
       <div class="field">
         <label>Оценка дня</label>
@@ -155,79 +153,57 @@
       </div>
     </section>
 
-    <!-- ===== ПЛАН (course tracker) ===== -->
+    <!-- ===== ГРАФИК ===== -->
     <section id="plan" class="screen">
-      <!-- View 1: list of courses -->
-      <div id="planCourses">
-        <div class="plan-head">
-          <div class="plan-head-title">Мои курсы</div>
-          <button class="ghost plan-import-btn" id="openImportBtn">+ Импорт</button>
+      <div class="schedule-day-title" id="scheduleDayTitle"></div>
+      <div id="scheduleEventList"></div>
+
+      <div class="calendar">
+        <div class="calendar-head">
+          <button class="cal-nav" id="calPrev" aria-label="Предыдущий месяц">‹</button>
+          <div class="calendar-month" id="calMonth"></div>
+          <button class="cal-nav" id="calNext" aria-label="Следующий месяц">›</button>
         </div>
-        <div id="coursesList"></div>
+        <div class="calendar-weekdays">
+          <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+        </div>
+        <div class="calendar-grid" id="calGrid"></div>
       </div>
 
-      <!-- View 2: course detail (day list) -->
-      <div id="planCourseDetail" hidden>
-        <button class="ghost back-btn" id="backToCoursesBtn">← Курсы</button>
-        <div id="courseDetailHead"></div>
-        <div id="daysList"></div>
-      </div>
-
-      <!-- View 3: day detail -->
-      <div id="planDayDetail" hidden>
-        <button class="ghost back-btn" id="backToDaysBtn">← Дни</button>
-        <div id="dayDetailBody"></div>
-      </div>
+      <button class="fab" id="addEventBtn" aria-label="Добавить событие">+ Добавить</button>
     </section>
   </main>
 
-  <!-- Import course modal -->
-  <div id="importOverlay" class="import-overlay" hidden>
-    <div class="import-modal">
-      <div class="import-head">
-        <div class="import-title">Импорт курса</div>
-        <button class="ghost import-close" id="importCloseBtn" aria-label="Закрыть">×</button>
+  <!-- Event modal -->
+  <div id="eventOverlay" class="modal-overlay" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <div class="modal-title">Новое событие</div>
+        <button class="ghost modal-close" id="eventCloseBtn" aria-label="Закрыть">×</button>
       </div>
 
       <div class="field">
-        <label>Название курса</label>
-        <input type="text" id="importName" placeholder="Мой курс">
+        <label>Время</label>
+        <input type="time" id="eventTime">
       </div>
 
       <div class="field">
-        <label>Цель</label>
-        <input type="text" id="importGoal" placeholder="Необязательно">
-      </div>
-
-      <div class="field">
-        <label>Дата старта</label>
-        <input type="date" id="importStart">
+        <label>Событие</label>
+        <input type="text" id="eventTitle" placeholder="Например, сходить в магазин">
       </div>
 
       <div class="field">
         <div class="label-row">
-          <label>Markdown курса</label>
-          <button class="mic" data-target="importMarkdown" aria-label="Голос">🎤</button>
+          <label>Примечание</label>
+          <button class="mic" data-target="eventNote" aria-label="Голос">🎤</button>
         </div>
-        <textarea id="importMarkdown" placeholder="Вставь сюда markdown…" style="min-height:180px;"></textarea>
+        <textarea id="eventNote" placeholder="Необязательно"></textarea>
       </div>
 
-      <div class="import-actions">
-        <button class="ghost" id="importCancelBtn">Отмена</button>
-        <button class="primary" id="importDoBtn">Импортировать</button>
+      <div class="modal-actions">
+        <button class="ghost" id="eventCancelBtn">Отмена</button>
+        <button class="primary" id="eventSaveBtn">Добавить</button>
       </div>
-    </div>
-  </div>
-
-  <!-- Phase timer overlay -->
-  <div id="timerOverlay" class="timer-overlay" hidden>
-    <div class="timer-label" id="timerLabel">Теория</div>
-    <div class="timer-time" id="timerTime">30:00</div>
-    <div class="timer-sub" id="timerSub">День 1</div>
-    <div class="timer-actions">
-      <button class="ghost" id="timerPause">Пауза</button>
-      <button class="ghost" id="timerExtend">+5 мин</button>
-      <button class="primary" id="timerStop">Стоп</button>
     </div>
   </div>
 

@@ -64,18 +64,6 @@
     return div.innerHTML;
   };
 
-  // Tiny inline markdown renderer: **bold** + line breaks + bare URLs.
-  // Just enough for phase bodies — no library.
-  const renderMarkdown = (s) => {
-    if (!s) return '';
-    let out = escape(s);
-    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    out = out.replace(/(https?:\/\/[^\s<]+)/g,
-      '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    out = out.replace(/\n/g, '<br>');
-    return out;
-  };
-
   let toastTimer;
   const toast = (text) => {
     let el = document.querySelector('.toast');
@@ -104,7 +92,7 @@
     notes: 'Заметки',
     history: 'История',
     reminders: 'Напоминания',
-    plan: 'План',
+    plan: 'График',
     data: 'Данные',
   };
 
@@ -121,7 +109,7 @@
     if (name === 'notes') renderNotes();
     if (name === 'reminders') renderReminders();
     if (name === 'today') loadToday();
-    if (name === 'plan') renderPlanView();
+    if (name === 'plan') renderSchedule();
   };
 
   const menuEl = $('menu');
@@ -263,7 +251,6 @@
     $('improve').value = entry?.improve || '';
     $('ratingValue').textContent = currentRating ? `${currentRating} / 10` : '—';
     renderStars(currentRating);
-    renderTodayCourses();
   };
 
   $('save').addEventListener('click', () => {
@@ -564,611 +551,168 @@
   };
 
   // ===================================================================
-  //  ПЛАН — Course tracker
+  //  ГРАФИК — события по дням + календарь
   // ===================================================================
-
-  // ---- Storage ----
-  const getCourses = () => {
-    try { return JSON.parse(localStorage.getItem('plan-courses') || '[]'); }
+  const getEvents = () => {
+    try { return JSON.parse(localStorage.getItem('schedule-events') || '[]'); }
     catch (_) { return []; }
   };
-  const saveCourses = (list) =>
-    localStorage.setItem('plan-courses', JSON.stringify(list));
+  const saveEventsList = (list) =>
+    localStorage.setItem('schedule-events', JSON.stringify(list));
 
-  // ---- Markdown course parser ----
-  // Exported via window.__parseCourseMarkdown for the sanity test.
-  function parseCourseMarkdown(md) {
-    if (!md || typeof md !== 'string') {
-      return { name: '', goal: '', days: [] };
+  let scheduleSelectedDate = dateKey();
+  let scheduleViewMonth = (() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() }; // m: 0..11
+  })();
+
+  function eventsByDate() {
+    const map = {};
+    for (const e of getEvents()) {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e);
     }
-
-    // 1) Course name from first H1.
-    let name = '';
-    const h1 = md.match(/^\s*#\s+(.+)$/m);
-    if (h1) name = h1[1].trim();
-
-    // 2) Course goal — line like **Цель:** ... (before any H3 День).
-    let goal = '';
-    const beforeFirstDay = md.split(/^\s*###\s+День\s+\d+/m)[0] || md;
-    const goalMatch = beforeFirstDay.match(/\*\*\s*Цель\s*:?\s*\*\*\s*(.+)/);
-    if (goalMatch) goal = goalMatch[1].trim();
-
-    // 3) Split into day blocks. Use lookahead so we keep the heading line.
-    // Day heading: ### День N [— title]   (allow extra spaces, em-dash, hyphen, colon)
-    const dayBlocks = [];
-    const dayRe = /^###\s+День\s+(\d+)\s*(?:[—\-:–]\s*(.*))?$/gm;
-    const matches = [];
-    let m;
-    while ((m = dayRe.exec(md)) !== null) {
-      matches.push({ index: m.index, end: dayRe.lastIndex, n: parseInt(m[1], 10), title: (m[2] || '').trim() });
-    }
-    for (let i = 0; i < matches.length; i++) {
-      const cur = matches[i];
-      const next = matches[i + 1];
-      const blockEnd = next ? next.index : md.length;
-      // Body of this day (excluding its heading line).
-      const body = md.slice(cur.end, blockEnd);
-      dayBlocks.push({ n: cur.n, title: cur.title, body });
-    }
-
-    // 4) Phase parser inside each day's body.
-    // Phase heading: a line starting with "**" containing "· N мин" or "· N min".
-    // Examples:
-    //   **🧠 Теория · 30 мин**
-    //   **📺 Видео · 20 мин**
-    //   **🎯 Практика · 70 мин** — 30 заданий №4
-    //   **📋 Аналитика · 30 мин** — стандарт.
-    //   **🎯 КОНТРОЛЬНАЯ №1 · 30 мин**
-    // Phase heading: a "**...**" line that contains "· N мин" somewhere inside.
-    // We allow extra text on either side of the duration so headings like
-    // "**🧠 Теория · 30 мин · Задание 6 (...)**" still match.
-    const PHASE_RE = /^\*\*([^*\n]*?·\s*\d+\s*мин[^*\n]*)\*\*\s*(.*)$/gm;
-    // Goal line: **✅ Цель:** ...
-    const GOAL_RE = /^\*\*\s*[✅✓]?\s*Цель\s*:?\s*\*\*\s*(.+)$/m;
-    // "---" terminates the block.
-
-    const detectType = (label) => {
-      if (/🧠|теори/i.test(label)) return 'theory';
-      if (/📺|видео/i.test(label)) return 'video';
-      if (/🎯|практик|контрольн|сочинени|проб/i.test(label)) return 'practice';
-      if (/📋|аналитик|разбор|самопроверк/i.test(label)) return 'analytics';
-      if (/⌚|⏱|✍️|🌙|утр/i.test(label)) return 'other';
-      return 'other';
-    };
-
-    const cleanLabel = (raw) => {
-      // raw = "🧠 Теория · 30 мин" → "Теория"
-      const noEmoji = raw
-        .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}️]/gu, '')
-        .trim();
-      const beforeDot = noEmoji.split('·')[0].trim();
-      return beforeDot || 'Этап';
-    };
-
-    const days = dayBlocks.map(({ n, title, body }) => {
-      // Cut at horizontal rule "---" (separator before next H2/H3).
-      const hrIdx = body.search(/^\s*---\s*$/m);
-      const blockBody = hrIdx >= 0 ? body.slice(0, hrIdx) : body;
-
-      // Find phases.
-      const phaseMatches = [];
-      PHASE_RE.lastIndex = 0;
-      let pm;
-      while ((pm = PHASE_RE.exec(blockBody)) !== null) {
-        phaseMatches.push({
-          start: pm.index,
-          headEnd: PHASE_RE.lastIndex,
-          headInner: pm[1].trim(),       // e.g. "🧠 Теория · 30 мин"
-          tail: (pm[2] || '').trim(),    // e.g. "— 30 заданий №4"
-        });
-      }
-
-      const phases = phaseMatches.map((ph, i) => {
-        const next = phaseMatches[i + 1];
-        const phaseBody = blockBody.slice(ph.headEnd, next ? next.start : blockBody.length).trim();
-        const minMatch = ph.headInner.match(/(\d+)\s*мин/);
-        const minutes = minMatch ? parseInt(minMatch[1], 10) : 30;
-        const label = cleanLabel(ph.headInner);
-        const type = detectType(ph.headInner);
-        // Combine tail (text after **...**) with body — tail often has "— подробности".
-        const fullBody = (ph.tail ? ph.tail + '\n' : '') + phaseBody;
-        return { type, label, minutes, body: fullBody.trim() };
-      });
-
-      // Day goal text.
-      let goalText = '';
-      const gm = blockBody.match(GOAL_RE);
-      if (gm) goalText = gm[1].trim();
-
-      return {
-        n,
-        title: title || `День ${n}`,
-        phases,
-        goalText,
-        done: false,
-        actualPercent: null,
-        notes: '',
-      };
-    });
-
-    return { name, goal, days };
-  }
-  // Expose for sanity test.
-  if (typeof window !== 'undefined') window.__parseCourseMarkdown = parseCourseMarkdown;
-
-  // ---- Plan view state ----
-  let planView = 'courses';     // 'courses' | 'course' | 'day'
-  let activeCourseId = null;
-  let activeDayN = null;
-
-  function renderPlanView() {
-    $('planCourses').hidden = planView !== 'courses';
-    $('planCourseDetail').hidden = planView !== 'course';
-    $('planDayDetail').hidden = planView !== 'day';
-
-    if (planView === 'courses') renderCoursesList();
-    else if (planView === 'course') renderCourseDetail();
-    else if (planView === 'day') renderDayDetail();
+    return map;
   }
 
-  // ---- View 1: courses list ----
-  function renderCoursesList() {
-    const courses = getCourses();
-    const c = $('coursesList');
-    if (!courses.length) {
-      c.innerHTML = `
-        <div class="empty-course">
-          <div class="empty-course-text">Курсов пока нет.<br>Скопируй markdown своего курса и вставь сюда.</div>
-          <button class="primary" id="emptyImportBtn">+ Импортировать курс</button>
-        </div>
-      `;
-      $('emptyImportBtn').addEventListener('click', openImportModal);
+  function renderSchedule() {
+    renderScheduleEvents();
+    renderCalendar();
+  }
+
+  function renderScheduleEvents() {
+    const titleEl = $('scheduleDayTitle');
+    const listEl = $('scheduleEventList');
+
+    titleEl.textContent = formatDate(scheduleSelectedDate);
+
+    const events = getEvents()
+      .filter((e) => e.date === scheduleSelectedDate)
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+    if (!events.length) {
+      listEl.innerHTML = '<div class="empty">Событий нет</div>';
       return;
     }
 
-    c.innerHTML = courses.map((cr) => {
-      const total = cr.days.length;
-      const done = cr.days.filter((d) => d.done).length;
-      const pct = total ? Math.round((done / total) * 100) : 0;
-      return `
-        <div class="course-card" data-course="${cr.id}">
-          <div class="course-card-head">
-            <div class="course-name">${escape(cr.name)}</div>
-            <button class="course-menu-btn" data-course-menu="${cr.id}" aria-label="Меню">⋯</button>
+    listEl.innerHTML = events.map((e) => `
+      <div class="schedule-item" data-id="${escape(e.id)}">
+        <span class="schedule-dash">—</span>
+        <div class="schedule-body">
+          <div class="schedule-line">
+            <span class="schedule-time">${escape(e.time || '')}</span>
+            <span class="schedule-title">${escape(e.title || '')}</span>
           </div>
-          ${cr.goal ? `<div class="course-goal">${escape(cr.goal)}</div>` : ''}
-          <div class="course-progress-row">
-            <span>${done} / ${total} дней</span>
-            <span>${pct}%</span>
-          </div>
-          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+          ${e.note ? `<div class="schedule-note">${escape(e.note)}</div>` : ''}
         </div>
-      `;
-    }).join('');
-
-    // Click course → open
-    c.querySelectorAll('.course-card').forEach((el) => {
-      el.addEventListener('click', (e) => {
-        if (e.target.closest('.course-menu-btn')) return;
-        activeCourseId = el.dataset.course;
-        planView = 'course';
-        renderPlanView();
-      });
-    });
-
-    // Course menu (delete)
-    c.querySelectorAll('.course-menu-btn').forEach((b) => {
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = b.dataset.courseMenu;
-        const cr = getCourses().find((x) => x.id === id);
-        if (!cr) return;
-        if (!confirm(`Удалить курс «${cr.name}»?`)) return;
-        saveCourses(getCourses().filter((x) => x.id !== id));
-        renderCoursesList();
-        toast('Курс удалён');
-      });
-    });
-  }
-
-  // ---- View 2: course detail (day list) ----
-  function renderCourseDetail() {
-    const cr = getCourses().find((x) => x.id === activeCourseId);
-    if (!cr) { planView = 'courses'; renderPlanView(); return; }
-
-    const total = cr.days.length;
-    const done = cr.days.filter((d) => d.done).length;
-    const pct = total ? Math.round((done / total) * 100) : 0;
-
-    const todayKey = dateKey();
-    const todayIdx = daysBetween(cr.startDate, todayKey) + 1; // 1-based n
-
-    $('courseDetailHead').innerHTML = `
-      <div class="course-detail-name">${escape(cr.name)}</div>
-      ${cr.goal ? `<div class="course-detail-goal">${escape(cr.goal)}</div>` : ''}
-      <div class="course-progress-row">
-        <span>${done} / ${total} дней</span>
-        <span>${pct}%</span>
-      </div>
-      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="course-detail-start">Старт: ${formatDate(cr.startDate)}</div>
-    `;
-
-    $('daysList').innerHTML = cr.days.map((d) => {
-      const status = d.done
-        ? 'done'
-        : (d.actualPercent != null || (d.notes && d.notes.length))
-          ? 'progress'
-          : 'todo';
-      const icon = status === 'done' ? '✓' : (status === 'progress' ? '⌛' : '☐');
-      const isToday = d.n === todayIdx;
-      const pctText = d.actualPercent != null ? ` · ${d.actualPercent}%` : '';
-      return `
-        <div class="day-row${isToday ? ' today' : ''}" data-day="${d.n}">
-          <div class="day-num">${d.n}</div>
-          <div class="day-info">
-            <div class="day-title">${escape(d.title)}</div>
-            ${d.goalText ? `<div class="day-goal">Цель: ${escape(d.goalText)}${pctText}</div>` : (pctText ? `<div class="day-goal">${pctText.replace(/^\s·\s/, '')}</div>` : '')}
-          </div>
-          <div class="day-status status-${status}">${icon}</div>
-        </div>
-      `;
-    }).join('');
-
-    $('daysList').querySelectorAll('.day-row').forEach((row) => {
-      row.addEventListener('click', () => {
-        activeDayN = parseInt(row.dataset.day, 10);
-        planView = 'day';
-        renderPlanView();
-      });
-    });
-  }
-
-  // ---- View 3: day detail ----
-  function renderDayDetail() {
-    const cr = getCourses().find((x) => x.id === activeCourseId);
-    if (!cr) { planView = 'courses'; renderPlanView(); return; }
-    const day = cr.days.find((d) => d.n === activeDayN);
-    if (!day) { planView = 'course'; renderPlanView(); return; }
-
-    const plannedKey = addDays(cr.startDate, day.n - 1);
-
-    const phaseIcon = (type) => {
-      if (type === 'theory') return '🧠';
-      if (type === 'video') return '📺';
-      if (type === 'practice') return '🎯';
-      if (type === 'analytics') return '📋';
-      return '⏱';
-    };
-
-    const phasesHtml = day.phases.map((p, i) => `
-      <div class="phase-card" data-phase="${i}">
-        <div class="phase-head">
-          <div class="phase-icon">${phaseIcon(p.type)}</div>
-          <div class="phase-label">${escape(p.label)}</div>
-          <div class="phase-min">${p.minutes} мин</div>
-        </div>
-        ${p.body ? `<div class="phase-body">${renderMarkdown(p.body)}</div>` : ''}
-        <button class="ghost phase-start" data-phase-start="${i}">▶ Запустить таймер</button>
+        <button class="delete" data-id="${escape(e.id)}" aria-label="Удалить">×</button>
       </div>
     `).join('');
 
-    $('dayDetailBody').innerHTML = `
-      <div class="day-detail-head">
-        <div class="day-detail-title">День ${day.n} · ${escape(day.title)}</div>
-        <div class="day-detail-sub">Дата по плану: ${formatDate(plannedKey)}</div>
-        ${day.goalText ? `<div class="day-detail-goal">Цель: ${escape(day.goalText)}</div>` : ''}
-      </div>
-
-      ${phasesHtml || '<div class="muted-line">У этого дня нет этапов.</div>'}
-
-      <div class="divider"></div>
-
-      <div class="field">
-        <label>Фактический результат, %</label>
-        <input type="number" id="dayActualPct" min="0" max="100" placeholder="0–100" value="${day.actualPercent != null ? day.actualPercent : ''}">
-      </div>
-
-      <div class="field">
-        <div class="label-row">
-          <label>Заметки по дню</label>
-          <button class="mic" data-target="dayNotes" aria-label="Голос">🎤</button>
-        </div>
-        <textarea id="dayNotes" placeholder="Что получилось, какие ошибки…">${escape(day.notes || '')}</textarea>
-      </div>
-
-      <button class="primary" id="dayDoneBtn">${day.done ? 'Снять отметку' : 'Отметить пройденным'}</button>
-    `;
-
-    // Phase start buttons
-    $('dayDetailBody').querySelectorAll('[data-phase-start]').forEach((b) => {
-      b.addEventListener('click', () => {
-        const idx = parseInt(b.dataset.phaseStart, 10);
-        const ph = day.phases[idx];
-        if (!ph) return;
-        startPhaseTimer(ph, day);
+    listEl.querySelectorAll('.delete').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        if (!confirm('Удалить событие?')) return;
+        const id = btn.dataset.id;
+        saveEventsList(getEvents().filter((e) => e.id !== id));
+        renderSchedule();
       });
     });
+  }
 
-    // Auto-save on blur
-    $('dayActualPct').addEventListener('blur', () => {
-      const v = $('dayActualPct').value.trim();
-      const num = v === '' ? null : Math.max(0, Math.min(100, parseInt(v, 10) || 0));
-      mutateDay((d) => { d.actualPercent = num; });
+  function renderCalendar() {
+    const grid = $('calGrid');
+    const monthEl = $('calMonth');
+    const { y, m } = scheduleViewMonth;
+
+    monthEl.textContent = new Date(y, m, 1).toLocaleDateString('ru-RU', {
+      month: 'long',
+      year: 'numeric',
     });
-    $('dayNotes').addEventListener('blur', () => {
-      const v = $('dayNotes').value;
-      mutateDay((d) => { d.notes = v; });
-    });
 
-    $('dayDoneBtn').addEventListener('click', () => {
-      mutateDay((d) => { d.done = !d.done; });
-      toast(day.done ? 'Снято' : 'День пройден ✓');
-      renderDayDetail();
-    });
-  }
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    // Понедельник = 0 .. Воскресенье = 6 (вместо JS-овского 0=Вс).
+    let leadEmpty = new Date(y, m, 1).getDay() - 1;
+    if (leadEmpty < 0) leadEmpty = 6;
 
-  function mutateDay(fn) {
-    const list = getCourses();
-    const cr = list.find((x) => x.id === activeCourseId);
-    if (!cr) return;
-    const d = cr.days.find((x) => x.n === activeDayN);
-    if (!d) return;
-    fn(d);
-    saveCourses(list);
-  }
+    const evMap = eventsByDate();
+    const todayK = dateKey();
 
-  // ---- Back buttons ----
-  $('backToCoursesBtn').addEventListener('click', () => {
-    planView = 'courses';
-    renderPlanView();
-  });
-  $('backToDaysBtn').addEventListener('click', () => {
-    planView = 'course';
-    renderPlanView();
-  });
-
-  // ===================================================================
-  //  Import modal
-  // ===================================================================
-  function openImportModal() {
-    $('importName').value = '';
-    $('importGoal').value = '';
-    $('importStart').value = dateKey();
-    $('importMarkdown').value = '';
-    $('importOverlay').hidden = false;
-    setTimeout(() => $('importMarkdown').focus(), 50);
-  }
-  function closeImportModal() {
-    $('importOverlay').hidden = true;
-  }
-
-  $('openImportBtn').addEventListener('click', openImportModal);
-  $('importCloseBtn').addEventListener('click', closeImportModal);
-  $('importCancelBtn').addEventListener('click', closeImportModal);
-
-  // Auto-fill name+goal as user types/pastes markdown.
-  $('importMarkdown').addEventListener('input', () => {
-    const md = $('importMarkdown').value;
-    if (!md) return;
-    const parsed = parseCourseMarkdown(md);
-    if (parsed.name && !$('importName').value.trim()) {
-      $('importName').value = parsed.name;
+    let html = '';
+    for (let i = 0; i < leadEmpty; i++) html += '<span class="cal-cell empty"></span>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const k = `${y}-${pad(m + 1)}-${pad(d)}`;
+      const cls = ['cal-cell'];
+      if (evMap[k] && evMap[k].length) cls.push('has-events');
+      if (k === todayK) cls.push('today');
+      if (k === scheduleSelectedDate) cls.push('selected');
+      html += `<button class="${cls.join(' ')}" data-date="${k}">${d}</button>`;
     }
-    if (parsed.goal && !$('importGoal').value.trim()) {
-      $('importGoal').value = parsed.goal;
-    }
+    grid.innerHTML = html;
+
+    grid.querySelectorAll('.cal-cell:not(.empty)').forEach((b) => {
+      b.addEventListener('click', () => {
+        scheduleSelectedDate = b.dataset.date;
+        renderSchedule();
+      });
+    });
+  }
+
+  // ---- FAB + модалка добавления события ----
+  function openEventModal() {
+    $('eventTime').value = timeStr(new Date());
+    $('eventTitle').value = '';
+    $('eventNote').value = '';
+    $('eventOverlay').hidden = false;
+    setTimeout(() => $('eventTitle').focus(), 50);
+  }
+  function closeEventModal() {
+    $('eventOverlay').hidden = true;
+  }
+
+  $('addEventBtn').addEventListener('click', openEventModal);
+  $('eventCloseBtn').addEventListener('click', closeEventModal);
+  $('eventCancelBtn').addEventListener('click', closeEventModal);
+  $('eventOverlay').addEventListener('click', (e) => {
+    if (e.target === $('eventOverlay')) closeEventModal();
   });
 
-  $('importDoBtn').addEventListener('click', () => {
-    const md = $('importMarkdown').value;
-    if (!md.trim()) { toast('Вставь markdown курса'); return; }
+  $('eventSaveBtn').addEventListener('click', () => {
+    const time = $('eventTime').value;
+    const title = $('eventTitle').value.trim();
+    const note = $('eventNote').value.trim();
+    if (!title) { toast('Укажи событие'); return; }
+    if (!time) { toast('Укажи время'); return; }
 
-    const parsed = parseCourseMarkdown(md);
-    if (!parsed.days.length) {
-      toast('Не нашёл дней. Заголовки должны быть `### День N — Название`');
-      return;
-    }
-
-    const totalPhases = parsed.days.reduce((acc, d) => acc + d.phases.length, 0);
-    if (!confirm(`Найдено: ${parsed.days.length} дней, ${totalPhases} фаз. Импортировать?`)) {
-      return;
-    }
-
-    const name = ($('importName').value.trim() || parsed.name || 'Мой курс');
-    const goal = $('importGoal').value.trim() || parsed.goal || '';
-    const startDate = $('importStart').value || dateKey();
-
-    const course = {
+    const list = getEvents();
+    list.push({
       id: newId(),
-      name,
-      goal,
-      startDate,
-      days: parsed.days,
-    };
-
-    const list = getCourses();
-    list.push(course);
-    saveCourses(list);
-    closeImportModal();
-    toast(`Импортировано: ${parsed.days.length} дней`);
-    planView = 'courses';
-    renderPlanView();
-  });
-
-  // ===================================================================
-  //  Phase timer (single-shot, replaces old Pomodoro overlay)
-  // ===================================================================
-  let timerState = {
-    active: false,
-    phaseLabel: '',
-    dayN: null,
-    courseName: '',
-    remaining: 0,        // seconds
-    paused: false,
-    interval: null,
-    autoCloseAt: 0,      // 0 = no auto close
-  };
-
-  const fmtMMSS = (sec) => {
-    if (sec < 0) sec = 0;
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${pad(m)}:${pad(s)}`;
-  };
-
-  function timerUpdateUI() {
-    $('timerTime').textContent = fmtMMSS(timerState.remaining);
-    $('timerLabel').textContent = timerState.phaseLabel || '';
-    const subParts = [];
-    if (timerState.dayN != null) subParts.push(`День ${timerState.dayN}`);
-    if (timerState.courseName) subParts.push(timerState.courseName);
-    $('timerSub').textContent = subParts.join(' · ');
-    $('timerPause').textContent = timerState.paused ? 'Продолжить' : 'Пауза';
-  }
-
-  function timerTick() {
-    if (!timerState.active) return;
-    if (timerState.autoCloseAt && Date.now() >= timerState.autoCloseAt) {
-      stopPhaseTimer();
-      return;
-    }
-    if (timerState.paused) return;
-    timerState.remaining -= 1;
-    if (timerState.remaining <= 0) {
-      timerState.remaining = 0;
-      $('timerTime').textContent = '00:00';
-      $('timerLabel').textContent = (timerState.phaseLabel || 'Этап') + ' завершён';
-      try { navigator.vibrate?.([300, 150, 300, 150, 600]); } catch (_) {}
-      notifyPhaseDone(timerState.phaseLabel || 'Этап');
-      // Schedule auto-close in 3 seconds.
-      timerState.autoCloseAt = Date.now() + 3000;
-      timerState.paused = true; // freeze countdown
-    } else {
-      $('timerTime').textContent = fmtMMSS(timerState.remaining);
-    }
-  }
-
-  async function notifyPhaseDone(label) {
-    if (!LocalNotifications) return;
-    try {
-      await LocalNotifications.schedule({
-        notifications: [{
-          id: hashId('timer|' + Date.now() + Math.random()),
-          title: 'Дневник',
-          body: `${label} завершён`,
-          schedule: { at: new Date(Date.now() + 50), allowWhileIdle: true },
-          smallIcon: 'ic_stat_icon_config_sample',
-        }],
-      });
-    } catch (_) {}
-  }
-
-  function startPhaseTimer(phase, day) {
-    if (timerState.active) {
-      if (!confirm('Идёт другой таймер. Прервать и запустить новый?')) return;
-      stopPhaseTimer(true);
-    }
-    const cr = getCourses().find((x) => x.id === activeCourseId);
-    timerState.active = true;
-    timerState.phaseLabel = phase.label;
-    timerState.dayN = day.n;
-    timerState.courseName = cr ? cr.name : '';
-    timerState.remaining = (phase.minutes || 30) * 60;
-    timerState.paused = false;
-    timerState.autoCloseAt = 0;
-    if (timerState.interval) clearInterval(timerState.interval);
-    timerState.interval = setInterval(timerTick, 1000);
-    timerUpdateUI();
-    $('timerOverlay').hidden = false;
-  }
-
-  function stopPhaseTimer(silent) {
-    if (timerState.interval) clearInterval(timerState.interval);
-    timerState.interval = null;
-    timerState.active = false;
-    timerState.paused = false;
-    timerState.autoCloseAt = 0;
-    $('timerOverlay').hidden = true;
-    if (!silent) toast('Таймер остановлен');
-  }
-
-  $('timerPause').addEventListener('click', () => {
-    if (!timerState.active) return;
-    timerState.paused = !timerState.paused;
-    timerUpdateUI();
-  });
-  $('timerExtend').addEventListener('click', () => {
-    if (!timerState.active) return;
-    timerState.remaining += 5 * 60;
-    timerState.autoCloseAt = 0;
-    timerState.paused = false;
-    timerUpdateUI();
-  });
-  $('timerStop').addEventListener('click', () => stopPhaseTimer());
-
-  // ===================================================================
-  //  Today widget — "Сегодня по курсам"
-  // ===================================================================
-  function renderTodayCourses() {
-    const c = $('todayCourses');
-    if (!c) return;
-    const courses = getCourses();
-    if (!courses.length) { c.innerHTML = ''; return; }
-
-    const todayKey = dateKey();
-    const rowsHtml = courses.map((cr) => {
-      const idx = daysBetween(cr.startDate, todayKey) + 1;
-      const total = cr.days.length;
-      let body;
-      if (idx < 1) {
-        const left = 1 - idx;
-        body = `<div class="today-course-meta">До старта осталось ${left} ${pluralDays(left)}</div>`;
-      } else if (idx > total) {
-        const done = cr.days.filter((d) => d.done).length;
-        const pct = total ? Math.round((done / total) * 100) : 0;
-        body = `<div class="today-course-meta">Курс завершён · ${pct}%</div>`;
-      } else {
-        const day = cr.days[idx - 1];
-        const isDone = day.done ? ' ✓' : '';
-        body = `
-          <div class="today-course-meta">Сегодня День ${day.n}: ${escape(day.title)}${isDone}</div>
-          <button class="ghost today-course-go" data-course="${cr.id}" data-day="${day.n}">Открыть</button>
-        `;
-      }
-      return `
-        <div class="today-course-row">
-          <div class="today-course-name">${escape(cr.name)}</div>
-          ${body}
-        </div>
-      `;
-    }).join('');
-
-    c.innerHTML = `
-      <div class="today-courses">
-        <div class="today-courses-head">Сегодня по курсам</div>
-        ${rowsHtml}
-      </div>
-    `;
-
-    c.querySelectorAll('.today-course-go').forEach((b) => {
-      b.addEventListener('click', () => {
-        activeCourseId = b.dataset.course;
-        activeDayN = parseInt(b.dataset.day, 10);
-        planView = 'day';
-        switchTab('plan');
-      });
+      date: scheduleSelectedDate,
+      time,
+      title,
+      note,
     });
-  }
+    saveEventsList(list);
+    closeEventModal();
+    renderSchedule();
+    toast('Добавлено');
+  });
 
-  function pluralDays(n) {
-    const m10 = n % 10;
-    const m100 = n % 100;
-    if (m100 >= 11 && m100 <= 14) return 'дней';
-    if (m10 === 1) return 'день';
-    if (m10 >= 2 && m10 <= 4) return 'дня';
-    return 'дней';
-  }
+  // ---- Навигация календаря ----
+  $('calPrev').addEventListener('click', () => {
+    if (--scheduleViewMonth.m < 0) {
+      scheduleViewMonth.m = 11;
+      scheduleViewMonth.y--;
+    }
+    renderCalendar();
+  });
+  $('calNext').addEventListener('click', () => {
+    if (++scheduleViewMonth.m > 11) {
+      scheduleViewMonth.m = 0;
+      scheduleViewMonth.y++;
+    }
+    renderCalendar();
+  });
 
   // ===================================================================
   //  ЭКСПОРТ / ИМПОРТ ДАННЫХ
