@@ -115,10 +115,13 @@ body {
   transform: translateY(-4px) scale(0.98);
   transform-origin: top right;
   transition: opacity 0.12s ease, transform 0.12s ease;
+  pointer-events: none;
 }
+.menu[hidden] { display: none; }
 .menu.open {
   opacity: 1;
   transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
 .menu-item {
