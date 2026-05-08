@@ -3,8 +3,6 @@ name: Build APK
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - 'www/manifest.json'
   workflow_dispatch:
 
 permissions:
@@ -37,11 +35,19 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Compute version
+        id: ver
+        run: |
+          BASE=$(node -p "require('./package.json').version")
+          OTA_VERSION="${BASE}.${{ github.run_number }}"
+          echo "ota_version=${OTA_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "OTA version = ${OTA_VERSION}"
+
       - name: Bump versionCode/versionName
         working-directory: android/app
         run: |
           sed -i "s/versionCode .*/versionCode ${{ github.run_number }}/" build.gradle
-          sed -i "s/versionName .*/versionName \"1.0.${{ github.run_number }}\"/" build.gradle
+          sed -i "s/versionName .*/versionName \"${{ steps.ver.outputs.ota_version }}\"/" build.gradle
           echo "--- updated build.gradle ---"
           grep -E "versionCode|versionName" build.gradle
 
@@ -56,15 +62,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Stage APK
+      - name: Stage release artifacts
         run: |
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/dnevnik.apk
-
-      - name: Bundle www.zip (capgo OTA payload)
-        run: |
-          mkdir -p out
           cd www && zip -r ../out/www.zip . && cd ..
+          cat > out/manifest.json <<EOF
+          {
+            "version": "${{ steps.ver.outputs.ota_version }}",
+            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip"
+          }
+          EOF
+          echo "--- manifest ---"
+          cat out/manifest.json
           ls -la out/
 
       - name: Upload artifact
@@ -86,43 +96,20 @@ jobs:
           tag_name: latest
           name: Latest build
           body: |
-            Свежая сборка дневника.
+            Свежая сборка дневника. Версия: ${{ steps.ver.outputs.ota_version }}
 
-            **Установка на Samsung:**
+            **Первичная установка на Samsung:**
             1. Скачай `dnevnik.apk` ниже.
             2. Открой файл на телефоне → разреши установку из этого источника.
             3. Установи.
+
+            **Дальше — обновляйся прямо в приложении**: три точки → «Проверить обновления» → «Обновить до vX». APK переустанавливать не надо.
 
             Если не приходят уведомления — отключи оптимизацию батареи для приложения «Дневник».
           files: |
             out/dnevnik.apk
             out/www.zip
+            out/manifest.json
           make_latest: 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update manifest.json (capgo OTA pointer)
-        if: github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          CODE=${{ github.run_number }}
-          cat > www/manifest.json <<EOF
-          {
-            "version": "${PKG_VERSION}",
-            "code": ${CODE},
-            "url": "https://github.com/${{ github.repository }}/releases/download/latest/www.zip"
-          }
-          EOF
-          cat www/manifest.json
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
-          if git diff --quiet www/manifest.json; then
-            echo "manifest.json unchanged — skipping commit"
-          else
-            git add www/manifest.json
-            git commit -m "ci: publish manifest.json [skip ci]"
-            git push origin HEAD:main
-          fi

@@ -1,12 +1,16 @@
-// OTA via @capgo/capacitor-updater (native, CORS-free, atomic bundle swap).
-// Exposes window.OTA with checkUpdate / forceResync / getCurrent / download_and_apply.
-// Fires window 'ota:ready' once notifyAppReady completes so app.js can render
-// the menu row safely.
+// OTA via @capgo/capacitor-updater (self-hosted on GitHub Releases).
+//
+// Источник правды — manifest.json в GitHub Release (тег `latest`).
+// Хост release-assets отдаёт всегда свежий файл (в отличие от raw.githubusercontent.com,
+// который кэшируется CDN до 5 минут и из-за этого юзер не видел новые версии).
+//
+// Текущая установленная OTA-версия = current().bundle.version. Никаких параллельных
+// localStorage-счётчиков — Capgo сам ведёт учёт.
 (function () {
   'use strict';
 
   var MANIFEST_URL =
-    'https://raw.githubusercontent.com/sergeyoooo4321-pixel/dnevnik/main/www/manifest.json';
+    'https://github.com/sergeyoooo4321-pixel/dnevnik/releases/download/latest/manifest.json';
 
   function plugins() {
     return (window.Capacitor && window.Capacitor.Plugins) || {};
@@ -18,30 +22,29 @@
     try {
       window.dispatchEvent(new CustomEvent('ota:ready'));
     } catch (_) {
-      // IE/older WebView fallback
       var ev = document.createEvent('Event');
       ev.initEvent('ota:ready', false, false);
       window.dispatchEvent(ev);
     }
   }
 
-  // Fetch the manifest via CapacitorHttp (bypasses WebView CORS).
-  // Returns { version, code, url, checksum? } or null on failure.
   function fetchManifest() {
     var H = http();
     if (!H) return Promise.resolve(null);
     return H.get({
       url: MANIFEST_URL + '?t=' + Date.now(),
       headers: { 'Cache-Control': 'no-cache' },
-      readTimeout: 8000,
-      connectTimeout: 8000,
+      readTimeout: 10000,
+      connectTimeout: 10000,
     }).then(function (res) {
       if (!res || (res.status && res.status >= 400)) return null;
       var data = res.data;
       if (typeof data === 'string') {
         try { data = JSON.parse(data); } catch (_) { return null; }
       }
-      if (!data || typeof data.code !== 'number') return null;
+      if (!data || typeof data.version !== 'string' || typeof data.url !== 'string') {
+        return null;
+      }
       return data;
     }).catch(function () { return null; });
   }
@@ -50,8 +53,8 @@
     var U = updater();
     if (!U) {
       return Promise.resolve({
-        bundle: { version: 'builtin', id: 'builtin' },
-        native: 'builtin',
+        bundle: { version: 'browser', id: 'browser' },
+        native: 'browser',
       });
     }
     return U.current().catch(function () {
@@ -59,88 +62,75 @@
     });
   }
 
-  // Compare manifest.code against the locally tracked installed code.
-  // We persist the last applied code in localStorage because capgo's
-  // BundleInfo doesn't carry a numeric code (only a version string).
-  function getLocalCode() {
-    var v = parseInt(localStorage.getItem('ota-code') || '0', 10);
-    return isNaN(v) ? 0 : v;
-  }
-  function setLocalCode(code, version) {
-    try {
-      localStorage.setItem('ota-code', String(code));
-      if (version) localStorage.setItem('ota-version', String(version));
-    } catch (_) {}
-  }
-
+  // { available: bool, currentVersion, latestVersion?, url?, offline? }
   function checkUpdate() {
-    return fetchManifest().then(function (m) {
-      return getCurrent().then(function (cur) {
-        var currentVersion = (cur && cur.bundle && cur.bundle.version) || 'builtin';
-        if (!m) {
-          return { available: false, currentVersion: currentVersion, offline: true };
-        }
-        var localCode = getLocalCode();
-        if (m.code > localCode) {
-          return {
-            available: true,
-            version: m.version,
-            code: m.code,
-            url: m.url,
-            currentVersion: currentVersion,
-          };
-        }
-        return { available: false, currentVersion: currentVersion, version: m.version };
-      });
+    return Promise.all([fetchManifest(), getCurrent()]).then(function (r) {
+      var manifest = r[0];
+      var cur = r[1];
+      var currentVersion = (cur && cur.bundle && cur.bundle.version) || 'builtin';
+      if (!manifest) {
+        return { available: false, currentVersion: currentVersion, offline: true };
+      }
+      var available = manifest.version !== currentVersion;
+      return {
+        available: available,
+        currentVersion: currentVersion,
+        latestVersion: manifest.version,
+        url: manifest.url,
+      };
     });
   }
 
-  function download_and_apply(url, version) {
+  // Скачать бандл по url и переключиться на него (Capgo сам перезагрузит WebView).
+  // onProgress(percent) — опциональный колбэк прогресса.
+  function applyUpdate(url, version, onProgress) {
     var U = updater();
-    if (!U) return Promise.reject(new Error('CapacitorUpdater not available'));
-    return U.download({ version: version, url: url, sessionKey: '' })
+    if (!U) return Promise.reject(new Error('CapacitorUpdater недоступен'));
+
+    var progressListener = null;
+    if (typeof onProgress === 'function') {
+      progressListener = U.addListener('download', function (e) {
+        if (e && typeof e.percent === 'number') onProgress(e.percent);
+      });
+    }
+    var cleanup = function () {
+      if (progressListener && progressListener.remove) {
+        try { progressListener.remove(); } catch (_) {}
+      }
+    };
+
+    return U.download({ version: version, url: url })
       .then(function (bundle) {
-        return U.set({ id: bundle.id }).then(function () { return bundle; });
+        return U.set({ id: bundle.id });
+      })
+      .then(function () {
+        cleanup();
+      })
+      .catch(function (err) {
+        cleanup();
+        throw err;
       });
-  }
-
-  function forceResync() {
-    return fetchManifest().then(function (m) {
-      if (!m) throw new Error('No manifest (offline?)');
-      return download_and_apply(m.url, m.version).then(function (bundle) {
-        setLocalCode(m.code, m.version);
-        return bundle;
-      });
-    });
-  }
-
-  // Wrap download_and_apply so we also persist the code on success.
-  function applyUpdate(url, version, code) {
-    return download_and_apply(url, version).then(function (bundle) {
-      setLocalCode(code, version);
-      return bundle;
-    });
   }
 
   window.OTA = {
     MANIFEST_URL: MANIFEST_URL,
     checkUpdate: checkUpdate,
-    forceResync: forceResync,
     getCurrent: getCurrent,
-    download_and_apply: applyUpdate,
+    applyUpdate: applyUpdate,
   };
 
   function boot() {
     var U = updater();
     if (!U) {
-      // Running in browser / plugin missing — still fire so app.js can render
-      // the offline state.
+      // Запущены в браузере (не в Capacitor) — плагин отсутствует.
       fireReady();
       return;
     }
+    // Обязателен на каждом запуске: иначе Capgo через appReadyTimeout (10s)
+    // откатит на builtin, считая текущий бандл сломанным.
     Promise.resolve()
       .then(function () { return U.notifyAppReady(); })
-      .catch(function () { /* ignore — app still works */ })
+      .catch(function () {})
       .then(fireReady);
   }
 

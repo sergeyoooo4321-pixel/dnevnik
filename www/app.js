@@ -1191,24 +1191,112 @@
     return wrap;
   }
 
-  function renderForceResyncRow(wrap) {
-    const link = document.createElement('button');
-    link.className = 'menu-item';
-    link.style.opacity = '0.7';
-    link.style.fontSize = '13px';
-    link.textContent = 'Перепроверить · Пересобрать';
-    link.addEventListener('click', async () => {
-      link.disabled = true;
-      link.textContent = 'Скачиваю…';
-      try {
-        await window.OTA.forceResync();
-        // capgo .set() reloads the WebView, so we shouldn't reach here.
-      } catch (e) {
-        link.textContent = 'Ошибка — нет интернета';
-        setTimeout(() => renderOtaMenuRow(), 1500);
-      }
-    });
-    wrap.appendChild(link);
+  // Одна кнопка с тремя состояниями: idle → checking → (update | uptodate | offline) → applying.
+  // По тапу: idle → проверка; если есть обновление — рендер «Обновить до vX»; ещё тап — скачивание.
+  let otaState = 'idle';
+
+  function renderOtaIdle(wrap, currentVersion) {
+    wrap.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'menu-version-static';
+    div.innerHTML =
+      '<span class="menu-version-title">Версия v' + escapeText(currentVersion) + '</span>';
+    wrap.appendChild(div);
+
+    const btn = document.createElement('button');
+    btn.className = 'menu-item';
+    btn.textContent = 'Проверить обновления';
+    btn.addEventListener('click', () => doCheck(wrap));
+    wrap.appendChild(btn);
+  }
+
+  async function doCheck(wrap) {
+    if (otaState !== 'idle') return;
+    otaState = 'checking';
+    wrap.innerHTML =
+      '<div class="menu-version-static">' +
+        '<span class="menu-version-title">Проверяю…</span>' +
+      '</div>';
+
+    let info;
+    try { info = await window.OTA.checkUpdate(); }
+    catch (_) { info = { available: false, offline: true, currentVersion: 'unknown' }; }
+
+    otaState = 'idle';
+    renderOtaResult(wrap, info);
+  }
+
+  function renderOtaResult(wrap, info) {
+    wrap.innerHTML = '';
+    const cur = info.currentVersion || 'unknown';
+
+    if (info.available) {
+      const btn = document.createElement('button');
+      btn.className = 'menu-item menu-update';
+      btn.innerHTML =
+        '<span class="dot"></span>' +
+        '<span>' +
+          '<span class="menu-update-title">Обновить до v' + escapeText(info.latestVersion) + '</span>' +
+          '<span class="menu-version-sub">сейчас v' + escapeText(cur) + '</span>' +
+        '</span>';
+      btn.addEventListener('click', () => doApply(wrap, info));
+      wrap.appendChild(btn);
+      return;
+    }
+
+    const div = document.createElement('div');
+    div.className = 'menu-version-static';
+    if (info.offline) {
+      div.innerHTML =
+        '<span class="menu-version-title">Нет интернета</span>' +
+        '<span class="menu-version-sub">v' + escapeText(cur) + '</span>';
+    } else {
+      div.innerHTML =
+        '<span class="menu-version-title">Уже последняя версия</span>' +
+        '<span class="menu-version-sub">v' + escapeText(cur) + '</span>';
+    }
+    wrap.appendChild(div);
+
+    const again = document.createElement('button');
+    again.className = 'menu-item';
+    again.style.opacity = '0.7';
+    again.style.fontSize = '13px';
+    again.textContent = 'Проверить ещё раз';
+    again.addEventListener('click', () => doCheck(wrap));
+    wrap.appendChild(again);
+  }
+
+  async function doApply(wrap, info) {
+    if (otaState !== 'idle') return;
+    otaState = 'applying';
+
+    const status = document.createElement('div');
+    status.className = 'menu-version-static';
+    status.innerHTML =
+      '<span class="menu-version-title">Скачиваю…</span>' +
+      '<span class="menu-version-sub" id="otaProgress">0%</span>';
+    wrap.innerHTML = '';
+    wrap.appendChild(status);
+
+    try {
+      await window.OTA.applyUpdate(info.url, info.latestVersion, (percent) => {
+        const el = $('otaProgress');
+        if (el) el.textContent = Math.round(percent) + '%';
+      });
+      // Capgo set() сам перезагружает WebView — сюда обычно не доходим.
+    } catch (e) {
+      otaState = 'idle';
+      wrap.innerHTML =
+        '<div class="menu-version-static">' +
+          '<span class="menu-version-title">Ошибка обновления</span>' +
+          '<span class="menu-version-sub">' + escapeText(e && e.message ? e.message : 'неизвестная') + '</span>' +
+        '</div>';
+      const retry = document.createElement('button');
+      retry.className = 'menu-item';
+      retry.textContent = 'Попробовать снова';
+      retry.addEventListener('click', () => doCheck(wrap));
+      wrap.appendChild(retry);
+    }
   }
 
   async function renderOtaMenuRow() {
@@ -1221,57 +1309,10 @@
     catch (_) { cur = { bundle: { version: 'unknown' } }; }
     const curVersion = (cur && cur.bundle && cur.bundle.version) || 'unknown';
 
-    let info;
-    try { info = await window.OTA.checkUpdate(); }
-    catch (_) { info = { available: false, currentVersion: curVersion, offline: true }; }
-
-    wrap.innerHTML = '';
-
-    if (info.available) {
-      const btn = document.createElement('button');
-      btn.className = 'menu-item menu-update';
-      btn.id = 'otaUpdateBtn';
-      btn.innerHTML =
-        '<span class="dot"></span>' +
-        '<span>' +
-          '<span class="menu-update-title">Доступно обновление</span>' +
-          '<span class="menu-version-sub">v' + escapeText(curVersion) +
-            ' → v' + escapeText(info.version) + '</span>' +
-        '</span>';
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        btn.innerHTML = '<span>Скачиваю…</span>';
-        try {
-          await window.OTA.download_and_apply(info.url, info.version, info.code);
-          // capgo .set() reloads the WebView.
-        } catch (e) {
-          btn.innerHTML = '<span>Ошибка — проверь интернет</span>';
-          setTimeout(() => renderOtaMenuRow(), 1500);
-        }
-      });
-      wrap.appendChild(btn);
-    } else if (info.offline) {
-      const div = document.createElement('div');
-      div.className = 'menu-version-static';
-      div.innerHTML =
-        '<span class="menu-version-title">Версия v' + escapeText(curVersion) +
-          ' · оффлайн</span>';
-      wrap.appendChild(div);
-      renderForceResyncRow(wrap);
-    } else {
-      const div = document.createElement('div');
-      div.className = 'menu-version-static';
-      div.innerHTML =
-        '<span class="menu-version-title">Максимальная версия</span>' +
-        '<span class="menu-version-sub">v' + escapeText(curVersion) + '</span>';
-      wrap.appendChild(div);
-      renderForceResyncRow(wrap);
-    }
+    renderOtaIdle(wrap, curVersion);
   }
 
   window.addEventListener('ota:ready', () => { renderOtaMenuRow(); });
-  // If updater.js already fired the event before app.js attached the
-  // listener (race on cold boot), schedule one render anyway.
   if (window.OTA) setTimeout(renderOtaMenuRow, 0);
 
   // ===================================================================
