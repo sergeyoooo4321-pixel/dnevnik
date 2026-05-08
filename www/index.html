@@ -170,7 +170,10 @@
 
     <!-- ===== ГРАФИК ===== -->
     <section id="plan" class="screen">
-      <div class="schedule-day-title" id="scheduleDayTitle"></div>
+      <div class="schedule-head">
+        <div class="schedule-day-title" id="scheduleDayTitle"></div>
+        <button class="add-pill" id="addEventBtn" aria-label="Добавить событие">+ Добавить</button>
+      </div>
       <div id="scheduleEventList"></div>
 
       <div class="calendar">
@@ -184,8 +187,6 @@
         </div>
         <div class="calendar-grid" id="calGrid"></div>
       </div>
-
-      <button class="fab" id="addEventBtn" aria-label="Добавить событие">+ Добавить</button>
     </section>
   </main>
 

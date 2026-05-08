@@ -163,7 +163,8 @@ body {
 }
 
 main {
-  padding: 8px 16px 100px;
+  padding: 8px 16px 24px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
   max-width: 640px;
   margin: 0 auto;
 }
@@ -1120,15 +1121,38 @@ textarea:focus, input:focus {
 }
 
 /* ===================== График / Schedule ===================== */
+.schedule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
 .schedule-day-title {
   font-family: var(--serif);
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--fg);
-  margin-bottom: 14px;
   line-height: 1.1;
+  flex: 1;
+  min-width: 0;
 }
+.add-pill {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: var(--tag-task);
+  color: #0a1d12;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  transition: transform 0.1s, opacity 0.15s;
+}
+.add-pill:active { transform: scale(0.95); opacity: 0.9; }
 
 .schedule-item {
   display: flex;
@@ -1176,10 +1200,10 @@ textarea:focus, input:focus {
   line-height: 1.4;
 }
 
-/* Calendar */
+/* Calendar — компактный, чтобы помещался без вертикального скролла */
 .calendar {
-  margin-top: 28px;
-  padding: 16px;
+  margin-top: 16px;
+  padding: 12px;
   border-radius: var(--r-card);
   background: var(--card);
 }
@@ -1187,24 +1211,24 @@ textarea:focus, input:focus {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .calendar-month {
   font-family: var(--serif);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--fg);
   text-transform: capitalize;
 }
 .cal-nav {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   border: none;
   background: var(--card-2);
   color: var(--fg);
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   font-family: inherit;
@@ -1215,38 +1239,39 @@ textarea:focus, input:focus {
 .calendar-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 3px;
+  margin-bottom: 4px;
 }
 .calendar-weekdays span {
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 600;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  gap: 3px;
 }
 .cal-cell {
-  aspect-ratio: 1 / 1;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--card-2);
   color: var(--fg);
   cursor: pointer;
   font-family: inherit;
+  padding: 0;
   transition: background 0.15s, transform 0.1s;
 }
 .cal-cell.empty {
@@ -1273,31 +1298,6 @@ textarea:focus, input:focus {
   box-shadow: inset 0 0 0 2px var(--fg);
 }
 .cal-cell:active { transform: scale(0.94); }
-
-/* FAB — кнопка добавления события */
-.fab {
-  position: fixed;
-  right: 20px;
-  bottom: calc(20px + env(safe-area-inset-bottom));
-  z-index: 50;
-  padding: 14px 22px;
-  background: var(--tag-task);
-  color: #0a1d12;
-  border: none;
-  border-radius: 999px;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4),
-              0 4px 10px rgba(123, 217, 160, 0.3);
-  letter-spacing: -0.01em;
-  transition: transform 0.1s, box-shadow 0.15s;
-}
-.fab:active {
-  transform: scale(0.95);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
 
 /* Generic modal (event modal) */
 .modal-overlay {
