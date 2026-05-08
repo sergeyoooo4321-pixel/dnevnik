@@ -25,7 +25,6 @@
       <button class="menu-item" role="menuitem" data-tab="history">История</button>
       <button class="menu-item" role="menuitem" data-tab="reminders">Напоминания</button>
       <button class="menu-item" role="menuitem" data-tab="plan">График</button>
-      <button class="menu-item" role="menuitem" data-tab="data">Данные</button>
       <button class="menu-item update-item" id="update-btn" role="menuitem">Обновить</button>
     </div>
   </header>
@@ -126,35 +125,6 @@
       <div class="divider"></div>
 
       <div id="remindersList"></div>
-    </section>
-
-    <!-- ===== ДАННЫЕ (экспорт/импорт) ===== -->
-    <section id="data" class="screen">
-      <div class="card">
-        <div class="field">
-          <label>Экспорт</label>
-          <div class="subtitle">Сохрани JSON со всеми записями, заметками, напоминаниями и курсами — пригодится при переустановке приложения или переезде на новое устройство.</div>
-          <textarea id="exportText" readonly placeholder="Нажми «Сформировать»…" style="min-height:160px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <button id="exportBuildBtn" class="ghost">Сформировать</button>
-            <button id="exportCopyBtn" class="primary">Скопировать</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
-      <div class="card">
-        <div class="field">
-          <label>Импорт</label>
-          <div class="subtitle">Вставь сюда JSON, сохранённый на этапе экспорта. Текущие данные будут перезаписаны.</div>
-          <textarea id="importText" placeholder="Вставь JSON сюда…" style="min-height:160px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;"></textarea>
-          <button id="importDoBtn2" class="primary" style="margin-top:8px;">Импортировать</button>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
     </section>
 
     <!-- ===== ГРАФИК ===== -->
