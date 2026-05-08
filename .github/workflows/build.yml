@@ -43,6 +43,8 @@ jobs:
           # самого Capacitor.
           sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/' variables.gradle
           sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 35/' variables.gradle
+          # play-services-tasks 18.4.1 требует minSdk>=23. Capacitor 6 ставит 22.
+          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 23/' variables.gradle
           echo "--- variables.gradle ---"
           grep -E "compileSdk|targetSdk|minSdk" variables.gradle
 
