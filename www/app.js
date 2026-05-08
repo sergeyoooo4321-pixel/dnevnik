@@ -105,6 +105,7 @@
     history: 'История',
     reminders: 'Напоминания',
     plan: 'План',
+    data: 'Данные',
   };
 
   const switchTab = (name) => {
@@ -1168,6 +1169,78 @@
     if (m10 >= 2 && m10 <= 4) return 'дня';
     return 'дней';
   }
+
+  // ===================================================================
+  //  ЭКСПОРТ / ИМПОРТ ДАННЫХ
+  //  Бэкап нужен перед сменой подписи APK (release-keystore) — Android
+  //  заставит удалить старую установку, и localStorage сотрётся.
+  //  Также защищает от потери данных при смене телефона.
+  // ===================================================================
+  function buildExportJson() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      // Не экспортируем служебные ключи Capgo и OTA-кэш — они привязаны
+      // к устройству и при импорте на другое устройство только запутают.
+      if (k && k.startsWith('CapacitorStorage.')) continue;
+      if (k === 'ota-code' || k === 'ota-version') continue;
+      data[k] = localStorage.getItem(k);
+    }
+    return JSON.stringify({
+      _meta: { app: 'dnevnik', exportedAt: new Date().toISOString() },
+      data,
+    }, null, 2);
+  }
+
+  function applyImportJson(json) {
+    let parsed;
+    try { parsed = JSON.parse(json); }
+    catch (_) { throw new Error('Не похоже на JSON'); }
+    if (!parsed || typeof parsed !== 'object' || !parsed.data || typeof parsed.data !== 'object') {
+      throw new Error('Структура файла не от дневника');
+    }
+    const keys = Object.keys(parsed.data);
+    for (const k of keys) {
+      const v = parsed.data[k];
+      if (typeof v === 'string') localStorage.setItem(k, v);
+    }
+    return keys.length;
+  }
+
+  $('exportBuildBtn').addEventListener('click', () => {
+    $('exportText').value = buildExportJson();
+    toast('Готово, можно копировать');
+  });
+
+  $('exportCopyBtn').addEventListener('click', async () => {
+    const text = $('exportText').value || buildExportJson();
+    $('exportText').value = text;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Скопировано в буфер');
+    } catch (_) {
+      // На некоторых WebView clipboard API не работает — показываем,
+      // чтобы юзер скопировал руками через выделение.
+      $('exportText').focus();
+      $('exportText').select();
+      toast('Выдели текст и скопируй вручную');
+    }
+  });
+
+  $('importDoBtn2').addEventListener('click', () => {
+    const text = $('importText').value.trim();
+    if (!text) { toast('Сначала вставь JSON'); return; }
+    if (!confirm('Импортировать? Текущие данные будут перезаписаны.')) return;
+    try {
+      const n = applyImportJson(text);
+      toast('Импортировано ключей: ' + n);
+      $('importText').value = '';
+      // Перерендерим открытую вкладку, чтобы новые данные подтянулись.
+      loadToday();
+    } catch (e) {
+      toast('Ошибка импорта: ' + (e.message || 'неизвестно'));
+    }
+  });
 
   // ===================================================================
   //  OTA menu row (powered by @capgo/capacitor-updater via updater.js)
