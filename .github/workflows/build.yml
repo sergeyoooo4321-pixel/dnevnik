@@ -35,6 +35,17 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Bump compileSdk/targetSdk to 35
+        working-directory: android
+        run: |
+          # Свежие зависимости Capgo (>=6.45) требуют compileSdk=35,
+          # а Capacitor 6 по дефолту ставит 34. Поднимаем без апгрейда
+          # самого Capacitor.
+          sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/' variables.gradle
+          sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 35/' variables.gradle
+          echo "--- variables.gradle ---"
+          grep -E "compileSdk|targetSdk|minSdk" variables.gradle
+
       - name: Harden AndroidManifest (allowBackup=false)
         working-directory: android/app/src/main
         run: |
