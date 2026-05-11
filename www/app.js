@@ -210,6 +210,205 @@
     voiceInput(btn.dataset.target, btn);
   });
 
+  // ---------- Wheel time picker (Samsung-style) ----------
+  const WHEEL_ITEM_H = 64; // пиксели; синхронизировать с CSS .wheel-item.
+
+  function buildWheel(listEl, count, selected) {
+    listEl.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    for (let i = 0; i < count; i++) {
+      const item = document.createElement('div');
+      item.className = 'wheel-item';
+      item.textContent = pad(i);
+      item.dataset.value = i;
+      frag.appendChild(item);
+    }
+    listEl.appendChild(frag);
+
+    const setSelected = () => {
+      const idx = Math.max(0, Math.min(count - 1,
+        Math.round(listEl.scrollTop / WHEEL_ITEM_H)));
+      listEl.querySelectorAll('.wheel-item').forEach((el, i) => {
+        el.classList.toggle('selected', i === idx);
+      });
+      listEl.dataset.value = idx;
+    };
+
+    let scrollTimer;
+    listEl.addEventListener('scroll', () => {
+      // Лёгкая «прилипающая» подсветка во время скролла.
+      const idx = Math.round(listEl.scrollTop / WHEEL_ITEM_H);
+      const cur = listEl.querySelector('.wheel-item.selected');
+      const next = listEl.children[idx];
+      if (next && cur !== next) {
+        if (cur) cur.classList.remove('selected');
+        next.classList.add('selected');
+        listEl.dataset.value = idx;
+      }
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(setSelected, 80);
+    });
+
+    // Клик по элементу — плавный скролл к нему.
+    listEl.addEventListener('click', (e) => {
+      const target = e.target.closest('.wheel-item');
+      if (!target) return;
+      const idx = parseInt(target.dataset.value, 10);
+      listEl.scrollTo({ top: idx * WHEEL_ITEM_H, behavior: 'smooth' });
+    });
+
+    // Стартовая позиция без анимации.
+    listEl.scrollTop = selected * WHEEL_ITEM_H;
+    setSelected();
+  }
+
+  let timePickerResolve = null;
+  function openTimePicker(initial, onDone) {
+    const overlay = $('timePickerOverlay');
+    const [hh, mm] = (initial || '08:00').split(':').map(Number);
+    const hList = overlay.querySelector('.wheel[data-unit="h"] .wheel-list');
+    const mList = overlay.querySelector('.wheel[data-unit="m"] .wheel-list');
+
+    overlay.hidden = false;
+    // Дать браузеру layout, потом построить колёса.
+    requestAnimationFrame(() => {
+      buildWheel(hList, 24, hh || 0);
+      buildWheel(mList, 60, mm || 0);
+    });
+
+    timePickerResolve = (value) => {
+      overlay.hidden = true;
+      timePickerResolve = null;
+      if (value !== null) onDone(value);
+    };
+  }
+
+  // Делаем поле времени кликабельным: открывает wheel-picker и пишет
+  // результат и в .value, и в текст внутри tile.
+  function bindTimeTile(tileId, onChange) {
+    const tile = $(tileId);
+    if (!tile) return;
+    tile.addEventListener('click', () => {
+      openTimePicker(tile.dataset.value || '08:00', (val) => {
+        tile.dataset.value = val;
+        tile.querySelector('.time-tile-value').textContent = val;
+        if (onChange) onChange(val);
+      });
+    });
+  }
+
+  function setTimeTile(tileId, val) {
+    const tile = $(tileId);
+    if (!tile) return;
+    tile.dataset.value = val;
+    tile.querySelector('.time-tile-value').textContent = val;
+  }
+  function getTimeTile(tileId) {
+    const tile = $(tileId);
+    return tile ? (tile.dataset.value || '') : '';
+  }
+
+  // ---------- Wheel date picker (мини-календарь bottom-sheet) ----------
+  const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const MONTHS = [
+    'Январь','Февраль','Март','Апрель','Май','Июнь',
+    'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь',
+  ];
+
+  let datePickerState = null; // { view: {y,m}, selected: 'YYYY-MM-DD', minKey, onDone }
+
+  function renderDatePicker() {
+    if (!datePickerState) return;
+    const { view, selected, minKey } = datePickerState;
+    const { y, m } = view;
+    $('datePickerMonth').textContent = `${MONTHS[m]} ${y}`;
+
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    let leadEmpty = new Date(y, m, 1).getDay() - 1;
+    if (leadEmpty < 0) leadEmpty = 6;
+
+    const today = dateKey();
+    let html = '';
+    for (let i = 0; i < leadEmpty; i++) html += '<span class="dp-cell empty"></span>';
+    for (let d = 1; d <= daysInMonth; d++) {
+      const k = `${y}-${pad(m + 1)}-${pad(d)}`;
+      const cls = ['dp-cell'];
+      if (k === today) cls.push('today');
+      if (k === selected) cls.push('selected');
+      if (minKey && k < minKey) cls.push('disabled');
+      html += `<button type="button" class="${cls.join(' ')}" data-date="${k}">${d}</button>`;
+    }
+    $('datePickerGrid').innerHTML = html;
+
+    $('datePickerGrid').querySelectorAll('.dp-cell:not(.empty):not(.disabled)').forEach((b) => {
+      b.addEventListener('click', () => {
+        datePickerState.selected = b.dataset.date;
+        renderDatePicker();
+      });
+    });
+  }
+
+  function openDatePicker(initial, { minKey, onDone }) {
+    const overlay = $('datePickerOverlay');
+    if (!overlay) return;
+    const sel = initial || dateKey();
+    const [y, m] = sel.split('-').map(Number);
+    datePickerState = {
+      view: { y, m: m - 1 },
+      selected: sel,
+      minKey: minKey || null,
+      onDone,
+    };
+    overlay.hidden = false;
+    renderDatePicker();
+  }
+
+  function closeDatePicker(commit) {
+    const overlay = $('datePickerOverlay');
+    if (!overlay) return;
+    if (commit && datePickerState && datePickerState.onDone) {
+      datePickerState.onDone(datePickerState.selected);
+    }
+    overlay.hidden = true;
+    datePickerState = null;
+  }
+
+  // Date-tile: аналог time-tile, открывает мини-календарь.
+  function bindDateTile(tileId, { minToday = false } = {}) {
+    const tile = $(tileId);
+    if (!tile) return;
+    tile.addEventListener('click', () => {
+      openDatePicker(tile.dataset.value || dateKey(), {
+        minKey: minToday ? dateKey() : null,
+        onDone: (val) => setDateTile(tileId, val),
+      });
+    });
+  }
+
+  function setDateTile(tileId, val) {
+    const tile = $(tileId);
+    if (!tile) return;
+    tile.dataset.value = val;
+    tile.querySelector('.date-tile-value').textContent = formatDateShort(val);
+  }
+  function getDateTile(tileId) {
+    const tile = $(tileId);
+    return tile ? (tile.dataset.value || '') : '';
+  }
+
+  // «12 мая, пн» — компактный формат для подписи под tile.
+  function formatDateShort(key) {
+    const [y, m, d] = key.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(y, m - 1, d).getTime();
+    const todayMs = today.getTime();
+    if (target === todayMs) return 'Сегодня';
+    if (target === todayMs + 86400000) return 'Завтра';
+    return dt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', weekday: 'short' });
+  }
+
   // ---------- Notification permission ----------
   async function ensureNotifPerm() {
     if (!LocalNotifications) return false;
@@ -218,6 +417,23 @@
     const req = await LocalNotifications.requestPermissions();
     return req.display === 'granted';
   }
+
+  // Стандартные Android intents для настроек приложения, оптимизации
+  // батареи и точных алармов. Работают на любом Android (Pixel, Xiaomi,
+  // Samsung, OnePlus и т.д.) — это часть Android API, не вендорные хуки.
+  const APP_PACKAGE = 'app.dnevnik.diary';
+  const openIntent = (intentUrl) => {
+    try { window.location.href = intentUrl; }
+    catch (e) { console.error('intent', e); toast('Не удалось открыть настройки'); }
+  };
+  const openAppSettings = () =>
+    openIntent(`intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;` +
+               `package=${APP_PACKAGE};end`);
+  const openBatterySettings = () =>
+    openIntent('intent:#Intent;action=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;end');
+  const openExactAlarmSettings = () =>
+    openIntent(`intent:#Intent;action=android.settings.REQUEST_SCHEDULE_EXACT_ALARM;` +
+               `data=package:${APP_PACKAGE};end`);
 
   // ===================================================================
   //  ДЕНЬ
@@ -466,7 +682,7 @@
 
   $('addReminder').addEventListener('click', async () => {
     const text = $('reminderText').value.trim();
-    const time = $('reminderTime').value;
+    const time = getTimeTile('reminderTime');
     if (!text || !time) {
       toast('Заполни сообщение и время');
       return;
@@ -492,7 +708,11 @@
               id,
               title: 'Дневник',
               body: text,
-              schedule: { on: { hour: hh, minute: mm }, allowWhileIdle: true },
+              schedule: {
+                on: { hour: hh, minute: mm },
+                repeats: true,
+                allowWhileIdle: true,
+              },
               smallIcon: 'ic_stat_icon_config_sample',
             }],
           });
@@ -506,7 +726,7 @@
       list.push({ id, kind: 'daily', text, hour: hh, minute: mm });
       saveReminders(list);
     } else {
-      const dateVal = $('reminderDate').value || dateKey();
+      const dateVal = getDateTile('reminderDate') || dateKey();
       const [y, m, d] = dateVal.split('-').map(Number);
       const when = new Date(y, m - 1, d, hh, mm, 0, 0);
       if (when.getTime() <= Date.now()) {
@@ -544,9 +764,8 @@
   const setReminderDefaults = () => {
     const next = new Date();
     next.setMinutes(next.getMinutes() + 60, 0, 0);
-    $('reminderDate').value = dateKey(next);
-    $('reminderDate').min = dateKey();
-    $('reminderTime').value = timeStr(next);
+    setDateTile('reminderDate', dateKey(next));
+    setTimeTile('reminderTime', timeStr(next));
   };
 
   // ===================================================================
@@ -659,7 +878,7 @@
 
   // ---- FAB + модалка добавления события ----
   function openEventModal() {
-    $('eventTime').value = timeStr(new Date());
+    setTimeTile('eventTime', timeStr(new Date()));
     $('eventTitle').value = '';
     $('eventNote').value = '';
     $('eventOverlay').hidden = false;
@@ -677,7 +896,7 @@
   });
 
   $('eventSaveBtn').addEventListener('click', () => {
-    const time = $('eventTime').value;
+    const time = getTimeTile('eventTime');
     const title = $('eventTitle').value.trim();
     const note = $('eventNote').value.trim();
     if (!title) { toast('Укажи событие'); return; }
@@ -750,6 +969,68 @@
 
   const updateBtn = document.getElementById('update-btn');
   if (updateBtn) updateBtn.addEventListener('click', checkForUpdate);
+
+  // ===================================================================
+  //  WHEEL PICKER — wiring (overlay buttons + tiles)
+  // ===================================================================
+  const timePickerOverlay = $('timePickerOverlay');
+  if (timePickerOverlay) {
+    $('timePickerOk').addEventListener('click', () => {
+      const hList = timePickerOverlay.querySelector('.wheel[data-unit="h"] .wheel-list');
+      const mList = timePickerOverlay.querySelector('.wheel[data-unit="m"] .wheel-list');
+      const h = pad(parseInt(hList.dataset.value || '0', 10));
+      const m = pad(parseInt(mList.dataset.value || '0', 10));
+      if (timePickerResolve) timePickerResolve(`${h}:${m}`);
+    });
+    $('timePickerCancel').addEventListener('click', () => {
+      if (timePickerResolve) timePickerResolve(null);
+    });
+    timePickerOverlay.addEventListener('click', (e) => {
+      if (e.target === timePickerOverlay && timePickerResolve) timePickerResolve(null);
+    });
+  }
+
+  bindTimeTile('reminderTime');
+  bindTimeTile('eventTime');
+  bindDateTile('reminderDate', { minToday: true });
+
+  // Кнопки навигации мини-календаря и Готово/Отмена.
+  const datePickerOverlay = $('datePickerOverlay');
+  if (datePickerOverlay) {
+    $('datePickerPrev').addEventListener('click', () => {
+      if (!datePickerState) return;
+      if (--datePickerState.view.m < 0) {
+        datePickerState.view.m = 11;
+        datePickerState.view.y--;
+      }
+      renderDatePicker();
+    });
+    $('datePickerNext').addEventListener('click', () => {
+      if (!datePickerState) return;
+      if (++datePickerState.view.m > 11) {
+        datePickerState.view.m = 0;
+        datePickerState.view.y++;
+      }
+      renderDatePicker();
+    });
+    $('datePickerOk').addEventListener('click', () => closeDatePicker(true));
+    $('datePickerCancel').addEventListener('click', () => closeDatePicker(false));
+    datePickerOverlay.addEventListener('click', (e) => {
+      if (e.target === datePickerOverlay) closeDatePicker(false);
+    });
+  }
+
+  // Кнопки-помощники в напоминаниях.
+  const notifHelpBtn = $('notifHelpBtn');
+  if (notifHelpBtn) notifHelpBtn.addEventListener('click', () => {
+    $('notifHelpPanel').hidden = !$('notifHelpPanel').hidden;
+  });
+  const fixAppBtn = $('notifOpenAppSettings');
+  if (fixAppBtn) fixAppBtn.addEventListener('click', openAppSettings);
+  const fixBatBtn = $('notifOpenBattery');
+  if (fixBatBtn) fixBatBtn.addEventListener('click', openBatterySettings);
+  const fixExactBtn = $('notifOpenExact');
+  if (fixExactBtn) fixExactBtn.addEventListener('click', openExactAlarmSettings);
 
   // ===================================================================
   //  INIT

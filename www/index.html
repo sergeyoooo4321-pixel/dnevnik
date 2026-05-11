@@ -111,15 +111,42 @@
 
         <div class="field" id="dateField">
           <label>Дата</label>
-          <input type="date" id="reminderDate">
+          <button type="button" class="date-tile" id="reminderDate">
+            <span class="date-tile-value">—</span>
+            <span class="date-tile-edit">Изменить</span>
+          </button>
         </div>
 
         <div class="field">
           <label>Время</label>
-          <input type="time" id="reminderTime">
+          <button type="button" class="time-tile" id="reminderTime" data-value="08:00">
+            <span class="time-tile-value">08:00</span>
+            <span class="time-tile-edit">Изменить</span>
+          </button>
         </div>
 
         <button id="addReminder" class="primary">Поставить</button>
+      </div>
+
+      <button type="button" class="notif-help-btn" id="notifHelpBtn">
+        Не приходят уведомления?
+      </button>
+      <div class="notif-help" id="notifHelpPanel" hidden>
+        <p class="notif-help-text">
+          Чтобы напоминания приходили, даже когда приложение закрыто, Android-у нужны пара разрешений. Открой по очереди:
+        </p>
+        <button type="button" class="ghost" id="notifOpenBattery">
+          1. Отключить экономию батареи
+        </button>
+        <button type="button" class="ghost" id="notifOpenExact">
+          2. Разрешить точные алармы
+        </button>
+        <button type="button" class="ghost" id="notifOpenAppSettings">
+          3. Открыть настройки приложения
+        </button>
+        <p class="notif-help-text muted">
+          Если кнопка не открывает нужный экран — найди приложение «Дневник» вручную в Настройках и разреши уведомления + сними ограничения батареи.
+        </p>
       </div>
 
       <div class="divider"></div>
@@ -159,7 +186,10 @@
 
       <div class="field">
         <label>Время</label>
-        <input type="time" id="eventTime">
+        <button type="button" class="time-tile" id="eventTime" data-value="08:00">
+          <span class="time-tile-value">08:00</span>
+          <span class="time-tile-edit">Изменить</span>
+        </button>
       </div>
 
       <div class="field">
@@ -178,6 +208,48 @@
       <div class="modal-actions">
         <button class="ghost" id="eventCancelBtn">Отмена</button>
         <button class="primary" id="eventSaveBtn">Добавить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Date picker (мини-календарь bottom-sheet) -->
+  <div id="datePickerOverlay" class="datepicker-overlay" hidden>
+    <div class="datepicker">
+      <div class="datepicker-title">Дата</div>
+      <div class="datepicker-head">
+        <button type="button" class="cal-nav" id="datePickerPrev" aria-label="Предыдущий месяц">‹</button>
+        <div class="datepicker-month" id="datePickerMonth"></div>
+        <button type="button" class="cal-nav" id="datePickerNext" aria-label="Следующий месяц">›</button>
+      </div>
+      <div class="datepicker-weekdays">
+        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+      </div>
+      <div class="datepicker-grid" id="datePickerGrid"></div>
+      <div class="datepicker-actions">
+        <button type="button" class="ghost" id="datePickerCancel">Отмена</button>
+        <button type="button" class="primary" id="datePickerOk">Готово</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Wheel time picker -->
+  <div id="timePickerOverlay" class="timepicker-overlay" hidden>
+    <div class="timepicker">
+      <div class="timepicker-title">Время</div>
+      <div class="timepicker-wheels">
+        <div class="wheel" data-unit="h">
+          <div class="wheel-frame"></div>
+          <div class="wheel-list"></div>
+        </div>
+        <div class="wheel-colon">:</div>
+        <div class="wheel" data-unit="m">
+          <div class="wheel-frame"></div>
+          <div class="wheel-list"></div>
+        </div>
+      </div>
+      <div class="timepicker-actions">
+        <button type="button" class="ghost" id="timePickerCancel">Отмена</button>
+        <button type="button" class="primary" id="timePickerOk">Готово</button>
       </div>
     </div>
   </div>

@@ -1357,3 +1357,361 @@ textarea:focus, input:focus {
   flex: 1;
   margin-top: 0;
 }
+
+/* ===================== Date tile (заменяет <input type="date">) ===================== */
+.date-tile {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--card);
+  border: 1px solid transparent;
+  border-radius: var(--r-input);
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.date-tile:active { transform: scale(0.99); background: var(--card-2); }
+.date-tile-value {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.date-tile-edit {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* ===================== Date picker overlay (мини-календарь) ===================== */
+.datepicker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 250;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.datepicker-overlay[hidden] { display: none; }
+
+.datepicker {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 18px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+  animation: tpSlideUp 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.datepicker-title {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.datepicker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.datepicker-month {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+  text-transform: capitalize;
+}
+
+.datepicker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.datepicker-weekdays span {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 4px 0;
+}
+
+.datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.dp-cell {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border: none;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+  transition: background 0.15s, transform 0.1s;
+}
+.dp-cell.empty {
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+.dp-cell.today {
+  box-shadow: inset 0 0 0 1.5px var(--muted);
+}
+.dp-cell.selected {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 700;
+}
+.dp-cell.disabled {
+  color: rgba(255, 255, 255, 0.18);
+  background: transparent;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+@media (prefers-color-scheme: light) {
+  .dp-cell.disabled { color: rgba(0, 0, 0, 0.18); }
+}
+.dp-cell:active { transform: scale(0.94); }
+
+.datepicker-actions {
+  display: flex;
+  gap: 10px;
+}
+.datepicker-actions .ghost,
+.datepicker-actions .primary {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+/* ===================== Time tile (заменяет <input type="time">) ===================== */
+.time-tile {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--card);
+  border: 1px solid transparent;
+  border-radius: var(--r-input);
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.time-tile:active { transform: scale(0.99); background: var(--card-2); }
+.time-tile-value {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+.time-tile-edit {
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* ===================== Notification help block ===================== */
+.notif-help-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.notif-help-btn:active { background: var(--card-2); color: var(--fg); }
+
+.notif-help {
+  margin-top: 8px;
+  padding: 14px 16px;
+  background: var(--card);
+  border-radius: var(--r-card);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.notif-help[hidden] { display: none; }
+.notif-help-text {
+  font-size: 13px;
+  color: var(--fg);
+  line-height: 1.45;
+  margin-bottom: 4px;
+}
+.notif-help-text.muted { color: var(--muted); font-size: 12px; margin-top: 4px; margin-bottom: 0; }
+.notif-help .ghost {
+  text-align: left;
+  font-size: 14px;
+  padding: 12px 14px;
+  background: var(--card-2);
+}
+
+/* ===================== Wheel time picker overlay ===================== */
+.timepicker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 250;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.timepicker-overlay[hidden] { display: none; }
+
+.timepicker {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg);
+  border-radius: 24px 24px 0 0;
+  padding: 20px 18px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+  animation: tpSlideUp 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes tpSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.timepicker-title {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.timepicker-wheels {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.wheel-colon {
+  font-size: 56px;
+  font-weight: 300;
+  color: var(--fg);
+  line-height: 1;
+  padding-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.wheel {
+  position: relative;
+  width: 110px;
+  height: 192px;            /* 3 × 64px */
+  overflow: hidden;
+}
+.wheel-frame {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 64px;
+  height: 64px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  pointer-events: none;
+  z-index: 1;
+}
+.wheel-list {
+  position: relative;
+  z-index: 0;
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 64px 0;          /* первый и последний элементы должны центрироваться */
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 25%, #000 75%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 25%, #000 75%, transparent 100%);
+  overscroll-behavior: contain;
+}
+.wheel-list::-webkit-scrollbar { display: none; }
+
+.wheel-item {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  font-size: 44px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.18);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  transition: color 0.15s, font-weight 0.15s, transform 0.15s;
+  user-select: none;
+  cursor: pointer;
+}
+@media (prefers-color-scheme: light) {
+  .wheel-item { color: rgba(0, 0, 0, 0.22); }
+}
+.wheel-item.selected {
+  color: var(--fg);
+  font-weight: 600;
+  transform: scale(1.06);
+}
+
+.timepicker-actions {
+  display: flex;
+  gap: 10px;
+}
+.timepicker-actions .ghost,
+.timepicker-actions .primary {
+  flex: 1;
+  margin-top: 0;
+  padding: 14px;
+  border-radius: 14px;
+  font-weight: 600;
+}

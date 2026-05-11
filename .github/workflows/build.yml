@@ -67,6 +67,19 @@ jobs:
           fi
           grep -E "allowBackup|application " AndroidManifest.xml | head -3
 
+      - name: Add USE_EXACT_ALARM permission (Android 13+)
+        working-directory: android/app/src/main
+        run: |
+          # USE_EXACT_ALARM выдаётся автоматически приложениям-будильникам/
+          # календарям/напоминалкам на Android 13+ и снимает задержки Doze.
+          # Capacitor 6 не добавляет её сам (появилось в 7.x), поэтому
+          # вставляем вручную. Работает на ВСЕХ Android (Pixel, Samsung,
+          # Xiaomi, OnePlus и т.д.) — это часть стандартного Android API.
+          if ! grep -q 'USE_EXACT_ALARM' AndroidManifest.xml; then
+            sed -i 's|</manifest>|    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n</manifest>|' AndroidManifest.xml
+          fi
+          grep -E "uses-permission" AndroidManifest.xml
+
       - name: Disable R8 minification (защита от поломки WebView/плагинов)
         working-directory: android/app
         run: |
