@@ -32,12 +32,33 @@ set_manifest_attr() {
   fi
 }
 
-ensure_permission() {
+remove_permission() {
   local file="$1"
   local permission="$2"
-  if ! grep -q "$permission" "$file"; then
-    sed -i "s|</manifest>|    <uses-permission android:name=\"${permission}\"/>\\n</manifest>|" "$file"
-  fi
+  sed -i -E "\\|<uses-permission[^>]+android:name=\"${permission}\"[^>]*/>|d" "$file"
+}
+
+set_manifest_icon() {
+  local file="$1"
+  set_manifest_attr "$file" icon "@mipmap/ic_launcher"
+  set_manifest_attr "$file" roundIcon "@mipmap/ic_launcher_round"
+}
+
+install_launcher_icons() {
+  mkdir -p \
+    android/app/src/main/res/drawable \
+    android/app/src/main/res/mipmap-anydpi \
+    android/app/src/main/res/mipmap-anydpi-v26 \
+    android/app/src/main/res/values
+
+  find android/app/src/main/res -path '*/mipmap-*' -name 'ic_launcher*.png' -delete
+  cp assets/android/drawable/ic_launcher.xml android/app/src/main/res/drawable/ic_launcher.xml
+  cp assets/android/drawable/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_foreground.xml
+  cp assets/android/mipmap-anydpi/ic_launcher.xml android/app/src/main/res/mipmap-anydpi/ic_launcher.xml
+  cp assets/android/mipmap-anydpi/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+  cp assets/android/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+  cp assets/android/mipmap-anydpi-v26/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+  cp assets/android/values/ic_launcher_background.xml android/app/src/main/res/values/ic_launcher_background.xml
 }
 
 require_file android/variables.gradle
@@ -52,9 +73,18 @@ set_gradle_var android/variables.gradle minSdkVersion 23
 # Diary data should not be exposed through adb backup, and WebView should stay HTTPS-only.
 set_manifest_attr android/app/src/main/AndroidManifest.xml allowBackup false
 set_manifest_attr android/app/src/main/AndroidManifest.xml usesCleartextTraffic false
+set_manifest_icon android/app/src/main/AndroidManifest.xml
 
-# Exact alarms keep reminder timing reliable on Android 13+.
-ensure_permission android/app/src/main/AndroidManifest.xml android.permission.USE_EXACT_ALARM
+# Google Play build is offline-only: no in-app updater, analytics, ads, or network sync.
+remove_permission android/app/src/main/AndroidManifest.xml android.permission.INTERNET
+remove_permission android/app/src/main/AndroidManifest.xml android.permission.USE_EXACT_ALARM
+if grep -qE 'android.permission.(INTERNET|USE_EXACT_ALARM|RECORD_AUDIO)' android/app/src/main/AndroidManifest.xml; then
+  echo "Blocked sensitive permission remains in AndroidManifest.xml" >&2
+  grep -E 'android.permission.(INTERNET|USE_EXACT_ALARM|RECORD_AUDIO)' android/app/src/main/AndroidManifest.xml >&2
+  exit 1
+fi
+
+install_launcher_icons
 
 # Keep R8 off until explicit keep rules are maintained for Capacitor plugins.
 if grep -q 'minifyEnabled' android/app/build.gradle; then
@@ -64,6 +94,6 @@ fi
 echo "--- android/variables.gradle ---"
 grep -E "compileSdk|targetSdk|minSdk" android/variables.gradle
 echo "--- AndroidManifest.xml application attrs ---"
-grep -E "allowBackup|usesCleartextTraffic|USE_EXACT_ALARM" android/app/src/main/AndroidManifest.xml
+grep -E "allowBackup|usesCleartextTraffic|android:icon|android:roundIcon|INTERNET|USE_EXACT_ALARM" android/app/src/main/AndroidManifest.xml || true
 echo "--- android/app/build.gradle minify ---"
 grep -E "minifyEnabled|shrinkResources" android/app/build.gradle || true

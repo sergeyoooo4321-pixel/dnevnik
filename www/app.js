@@ -4,8 +4,6 @@
   // ---------- Capacitor plugins ----------
   const Cap = window.Capacitor;
   const LocalNotifications = Cap?.Plugins?.LocalNotifications || null;
-  const SpeechRecognition = Cap?.Plugins?.SpeechRecognition || null;
-  const Browser = Cap?.Plugins?.Browser || null;
 
   // ---------- Tags ----------
   const TAGS = [
@@ -83,12 +81,6 @@
 
   const newId = () => `${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
 
-  function hashId(s) {
-    let h = 0;
-    for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-    return Math.abs(h);
-  }
-
   // ---------- Tabs / Kebab menu ----------
   const SCREEN_TITLES = {
     today: 'День',
@@ -96,6 +88,7 @@
     history: 'История',
     reminders: 'Напоминания',
     plan: 'График',
+    privacy: 'Конфиденциальность',
   };
 
   const switchTab = (name) => {
@@ -147,71 +140,6 @@
       closeMenu();
     })
   );
-
-  // ---------- Voice input ----------
-  let activeMicBtn = null;
-
-  async function voiceInput(targetId, btn) {
-    const target = $(targetId);
-    if (!target) return;
-
-    if (!SpeechRecognition) {
-      toast('Голос: используй значок микрофона в клавиатуре Samsung');
-      target.focus();
-      return;
-    }
-
-    if (activeMicBtn === btn) {
-      try { await SpeechRecognition.stop(); } catch (_) {}
-      btn.classList.remove('listening');
-      activeMicBtn = null;
-      return;
-    }
-
-    try {
-      const avail = await SpeechRecognition.available();
-      if (!avail.available) {
-        toast('Распознавание речи недоступно');
-        return;
-      }
-      const perm = await SpeechRecognition.checkPermissions();
-      if (perm.speechRecognition !== 'granted') {
-        const r = await SpeechRecognition.requestPermissions();
-        if (r.speechRecognition !== 'granted') {
-          toast('Разреши доступ к микрофону');
-          return;
-        }
-      }
-      btn.classList.add('listening');
-      activeMicBtn = btn;
-      const result = await SpeechRecognition.start({
-        language: 'ru-RU',
-        maxResults: 1,
-        partialResults: false,
-        popup: false,
-      });
-      btn.classList.remove('listening');
-      activeMicBtn = null;
-      const phrase = (result?.matches && result.matches[0]) || '';
-      if (phrase) {
-        target.value = target.value ? `${target.value} ${phrase}` : phrase;
-        target.dispatchEvent(new Event('input'));
-      }
-    } catch (e) {
-      console.error('voice', e);
-      btn.classList.remove('listening');
-      activeMicBtn = null;
-      toast('Ошибка голоса. Попробуй ещё раз.');
-    }
-  }
-
-  // Wire all .mic buttons (delegate so dynamic ones work too).
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.mic');
-    if (!btn) return;
-    e.preventDefault();
-    voiceInput(btn.dataset.target, btn);
-  });
 
   // ---------- Wheel time picker (Samsung-style) ----------
   const WHEEL_ITEM_H = 64; // пиксели; синхронизировать с CSS .wheel-item.
@@ -428,9 +356,7 @@
     return req.display === 'granted';
   }
 
-  // Стандартные Android intents для настроек приложения, оптимизации
-  // батареи и точных алармов. Работают на любом Android (Pixel, Xiaomi,
-  // Samsung, OnePlus и т.д.) — это часть Android API, не вендорные хуки.
+  // Стандартные Android intents для настроек приложения и оптимизации батареи.
   const APP_PACKAGE = 'app.dnevnik.diary';
   const openIntent = (intentUrl) => {
     try { window.location.href = intentUrl; }
@@ -441,9 +367,6 @@
                `package=${APP_PACKAGE};end`);
   const openBatterySettings = () =>
     openIntent('intent:#Intent;action=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS;end');
-  const openExactAlarmSettings = () =>
-    openIntent(`intent:#Intent;action=android.settings.REQUEST_SCHEDULE_EXACT_ALARM;` +
-               `data=package:${APP_PACKAGE};end`);
 
   // ===================================================================
   //  ДЕНЬ
@@ -820,7 +743,6 @@
               schedule: {
                 on: { hour: hh, minute: mm },
                 repeats: true,
-                allowWhileIdle: true,
               },
               smallIcon: 'ic_stat_icon_config_sample',
             }],
@@ -849,7 +771,7 @@
               id,
               title: 'Дневник',
               body: text,
-              schedule: { at: when, allowWhileIdle: true },
+              schedule: { at: when },
               smallIcon: 'ic_stat_icon_config_sample',
             }],
           });
@@ -1041,82 +963,6 @@
     renderCalendar();
   });
 
-
-  // ===================================================================
-  //  ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ — скачать manifest и открыть APK в системном браузере
-  // ===================================================================
-  const REPO = 'sergeyoooo4321-pixel/dnevnik';
-  const APK_URL = `https://github.com/${REPO}/releases/download/latest/dnevnik.apk`;
-  const VERSION_URL = `https://github.com/${REPO}/releases/download/latest/version.json`;
-  const RELEASE_API_URL = `https://api.github.com/repos/${REPO}/releases/tags/latest`;
-  const VERSION_ASSET = 'version.json';
-
-  async function openExternalUrl(url) {
-    if (Browser?.open) {
-      await Browser.open({ url });
-      return;
-    }
-    const opened = window.open(url, '_system');
-    if (!opened) window.location.href = url;
-  }
-
-  async function fetchUpdateManifest() {
-    const releaseRes = await fetch(RELEASE_API_URL, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/vnd.github+json' },
-    });
-    if (!releaseRes.ok) throw new Error('GitHub release HTTP ' + releaseRes.status);
-
-    const release = await releaseRes.json();
-    const asset = (release.assets || []).find((a) => a.name === VERSION_ASSET);
-    if (!asset) throw new Error('version.json not found');
-
-    try {
-      const directRes = await fetch(asset.browser_download_url || VERSION_URL, { cache: 'no-store' });
-      if (directRes.ok) return await directRes.json();
-    } catch (_) {
-      // Some WebViews reject redirected release assets by CORS; API asset URL is the fallback.
-    }
-
-    const assetRes = await fetch(asset.url, {
-      cache: 'no-store',
-      headers: { 'Accept': 'application/octet-stream' },
-    });
-    if (!assetRes.ok) throw new Error('version asset HTTP ' + assetRes.status);
-    return JSON.parse(await assetRes.text());
-  }
-
-  async function checkForUpdate() {
-    const btn = document.getElementById('update-btn');
-    if (!btn) return;
-    btn.textContent = 'Проверяю';
-    btn.disabled = true;
-    try {
-      const manifest = await fetchUpdateManifest();
-      const remoteSha = String(manifest.sha || '');
-      const remoteVersion = String(manifest.version || '');
-      if (remoteSha && remoteSha === window.BUILD_SHA) {
-        btn.textContent = 'Актуальная версия';
-        toast('Уже стоит свежая версия');
-        await new Promise((r) => setTimeout(r, 2000));
-        return;
-      }
-      const label = remoteVersion ? ` ${remoteVersion}` : '';
-      if (confirm(`Доступна новая версия${label}. Скачать APK?`)) {
-        await openExternalUrl(manifest.apkUrl || APK_URL);
-      }
-    } catch (e) {
-      console.error('update check', e);
-      toast('Не удалось проверить обновление');
-    } finally {
-      btn.textContent = 'Обновить';
-      btn.disabled = false;
-    }
-  }
-
-  const updateBtn = document.getElementById('update-btn');
-  if (updateBtn) updateBtn.addEventListener('click', checkForUpdate);
-
   // ===================================================================
   //  WHEEL PICKER — wiring (overlay buttons + tiles)
   // ===================================================================
@@ -1176,8 +1022,6 @@
   if (fixAppBtn) fixAppBtn.addEventListener('click', openAppSettings);
   const fixBatBtn = $('notifOpenBattery');
   if (fixBatBtn) fixBatBtn.addEventListener('click', openBatterySettings);
-  const fixExactBtn = $('notifOpenExact');
-  if (fixExactBtn) fixExactBtn.addEventListener('click', openExactAlarmSettings);
 
   // ===================================================================
   //  INIT

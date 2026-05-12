@@ -9,21 +9,20 @@
 - История записей по датам
 - Поиск, статистика и редактирование прошлых дней из истории
 - Напоминания с системными уведомлениями
+- Без рекламы, аналитики, трекеров и встроенных сетевых запросов
 
-## Как установить APK на телефон
+## Google Play
 
-1. Открой вкладку [Releases](../../releases) → релиз **Latest build**.
-2. Скачай файл `dnevnik.apk` на телефон.
-3. На Samsung: при первом запуске установщика разреши установку из этого источника (Настройки → Безопасность → Установка неизвестных приложений).
-4. Открой `dnevnik.apk` в файловом менеджере → Установить.
+Проект подготовлен под публикацию в Google Play. GitHub Actions собирает подписанный Android App Bundle `dnevnik-play.aab`.
 
-Если уведомления не приходят вовремя — зайди в настройки приложения «Дневник» и отключи оптимизацию батареи (One UI любит душить фоновые таймеры).
+Инструкции для Play Console лежат в [`play/README.md`](play/README.md).
 
-## Как обновлять
+## Безопасность
 
-Любой пуш в `main` запускает GitHub Actions, который пересобирает APK и обновляет релиз `latest`. Вместе с APK публикуется `version.json`; кнопка «Обновить» в приложении сверяет SHA сборки по нему и открывает скачивание нового APK.
-
-Просто скачай новый `dnevnik.apk` и поставь поверх старого — данные не потеряются (хранятся в локальном хранилище приложения).
+- In-app updater удалён: обновления идут через Google Play.
+- Разрешения `INTERNET`, `RECORD_AUDIO` и `USE_EXACT_ALARM` не используются в Play-сборке.
+- В HTML задан CSP с `connect-src 'none'`.
+- Android manifest в CI патчится с `allowBackup=false` и `usesCleartextTraffic=false`.
 
 ## Разработка
 
@@ -39,10 +38,13 @@ www/                    # веб-приложение (HTML/CSS/JS)
   index.html
   style.css
   app.js
+assets/                 # иконки Play/Android
+docs/                   # privacy policy для публикации
+play/                   # материалы для Play Console
 capacitor.config.json   # конфиг Capacitor
 package.json            # зависимости
 scripts/                # локальные проверки и CI-патчи Android
-.github/workflows/      # автосборка APK
+.github/workflows/      # автосборка AAB
 ```
 
 `android/` генерируется в CI и не коммитится.

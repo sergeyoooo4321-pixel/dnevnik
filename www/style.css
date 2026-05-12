@@ -185,14 +185,6 @@ main {
 
 .field { margin-bottom: 16px; }
 
-.label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  gap: 10px;
-}
-
 label {
   display: block;
   font-size: 11px;
@@ -200,8 +192,8 @@ label {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 600;
+  margin-bottom: 8px;
 }
-.label-row label { margin-bottom: 0; }
 
 textarea,
 input[type="text"],
@@ -279,34 +271,6 @@ input:focus-visible {
   display: block;
   font-size: 13px;
   color: var(--muted);
-}
-
-/* Mic button */
-.mic {
-  background: var(--card);
-  border: none;
-  border-radius: 999px;
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-  cursor: pointer;
-  color: var(--fg);
-  font-family: inherit;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s, transform 0.1s;
-  flex-shrink: 0;
-}
-.mic:active { transform: scale(0.92); }
-.mic.listening {
-  background: var(--danger);
-  color: white;
-  animation: pulse 1.2s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
 }
 
 /* Stars */
@@ -678,6 +642,24 @@ input:focus-visible {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+.privacy-card {
+  background: var(--card);
+  border-radius: var(--r-card);
+  padding: 18px;
+}
+.privacy-card h2 {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.privacy-card p {
+  color: var(--fg);
+  font-size: 14px;
+  line-height: 1.55;
+  margin-top: 10px;
 }
 
 /* ===================== График / Schedule ===================== */

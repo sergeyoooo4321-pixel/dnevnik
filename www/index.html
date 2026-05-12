@@ -7,6 +7,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; media-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <title>Дневник</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -25,7 +26,7 @@
       <button class="menu-item" role="menuitem" data-tab="history">История</button>
       <button class="menu-item" role="menuitem" data-tab="reminders">Напоминания</button>
       <button class="menu-item" role="menuitem" data-tab="plan">График</button>
-      <button class="menu-item update-item" id="update-btn" role="menuitem">Обновить</button>
+      <button class="menu-item" role="menuitem" data-tab="privacy">Конфиденциальность</button>
     </div>
   </header>
 
@@ -48,18 +49,12 @@
       </div>
 
       <div class="field">
-        <div class="label-row">
-          <label for="done">Что сделал</label>
-          <button class="mic" data-target="done" aria-label="Голос">🎤</button>
-        </div>
+        <label for="done">Что сделал</label>
         <textarea id="done" placeholder="Что было сделано…"></textarea>
       </div>
 
       <div class="field">
-        <div class="label-row">
-          <label for="improve">Что улучшить</label>
-          <button class="mic" data-target="improve" aria-label="Голос">🎤</button>
-        </div>
+        <label for="improve">Что улучшить</label>
         <textarea id="improve" placeholder="Что хочется поправить…"></textarea>
       </div>
 
@@ -70,10 +65,7 @@
     <section id="notes" class="screen">
       <div class="card">
         <div class="field">
-          <div class="label-row">
-            <label for="noteText">Новая заметка</label>
-            <button class="mic" data-target="noteText" aria-label="Голос">🎤</button>
-          </div>
+          <label for="noteText">Новая заметка</label>
           <textarea id="noteText" placeholder="Мысль, идея, что угодно…"></textarea>
         </div>
 
@@ -116,10 +108,7 @@
         </div>
 
         <div class="field">
-          <div class="label-row">
-            <label for="reminderText">Сообщение</label>
-            <button class="mic" data-target="reminderText" aria-label="Голос">🎤</button>
-          </div>
+          <label for="reminderText">Сообщение</label>
           <input type="text" id="reminderText" placeholder="Что напомнить?">
         </div>
 
@@ -147,16 +136,13 @@
       </button>
       <div class="notif-help" id="notifHelpPanel" hidden>
         <p class="notif-help-text">
-          Чтобы напоминания приходили, даже когда приложение закрыто, Android-у нужны пара разрешений. Открой по очереди:
+          Чтобы напоминания приходили стабильнее, Android-у нужны разрешения на уведомления и работа без жёсткой экономии батареи.
         </p>
         <button type="button" class="ghost" id="notifOpenBattery">
           1. Отключить экономию батареи
         </button>
-        <button type="button" class="ghost" id="notifOpenExact">
-          2. Разрешить точные алармы
-        </button>
         <button type="button" class="ghost" id="notifOpenAppSettings">
-          3. Открыть настройки приложения
+          2. Открыть настройки приложения
         </button>
         <p class="notif-help-text muted">
           Если кнопка не открывает нужный экран — найди приложение «Дневник» вручную в Настройках и разреши уведомления + сними ограничения батареи.
@@ -188,6 +174,16 @@
         <div class="calendar-grid" id="calGrid"></div>
       </div>
     </section>
+
+    <!-- ===== КОНФИДЕНЦИАЛЬНОСТЬ ===== -->
+    <section id="privacy" class="screen">
+      <div class="privacy-card">
+        <h2>Конфиденциальность</h2>
+        <p>Дневник работает оффлайн. Записи, заметки, события и напоминания хранятся только в локальном хранилище приложения на устройстве.</p>
+        <p>Приложение не содержит рекламы, аналитики, трекеров, серверной синхронизации и встроенных сетевых запросов.</p>
+        <p>При удалении приложения Android удалит локальные данные приложения. Перед публикацией в Google Play отдельные бэкапы не включались по твоему запросу.</p>
+      </div>
+    </section>
   </main>
 
   <!-- Event modal -->
@@ -212,10 +208,7 @@
       </div>
 
       <div class="field">
-        <div class="label-row">
-          <label for="eventNote">Примечание</label>
-          <button class="mic" data-target="eventNote" aria-label="Голос">🎤</button>
-        </div>
+        <label for="eventNote">Примечание</label>
         <textarea id="eventNote" placeholder="Необязательно"></textarea>
       </div>
 
@@ -268,7 +261,6 @@
     </div>
   </div>
 
-  <script src="build-info.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

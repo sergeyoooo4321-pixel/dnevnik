@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Дневник">
+  <rect width="512" height="512" rx="112" fill="#101418"/>
+  <rect x="126" y="72" width="276" height="368" rx="42" fill="#F7F0E3"/>
+  <rect x="126" y="72" width="64" height="368" rx="36" fill="#8A5A44"/>
+  <path d="M190 72h34v368h-34z" fill="#C99766" opacity=".7"/>
+  <path d="M322 72h46v134l-23-18-23 18z" fill="#D64D3B"/>
+  <path d="M238 184h98M238 238h88M238 292h74" fill="none" stroke="#20262D" stroke-width="20" stroke-linecap="round"/>
+  <path d="M234 348l34 34 74-82" fill="none" stroke="#2E9F6E" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="156" cy="142" r="10" fill="#F7F0E3" opacity=".8"/>
+  <circle cx="156" cy="256" r="10" fill="#F7F0E3" opacity=".8"/>
+  <circle cx="156" cy="370" r="10" fill="#F7F0E3" opacity=".8"/>
+</svg>
