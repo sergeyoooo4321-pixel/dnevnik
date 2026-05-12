@@ -4,11 +4,15 @@
   "private": true,
   "description": "Personal diary Android app",
   "scripts": {
-    "sync": "cap sync android"
+    "check": "node scripts/check.js",
+    "lint": "node scripts/check.js",
+    "sync": "cap sync android",
+    "test": "npm run check"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "6.0.1",
     "@capacitor/android": "6.2.1",
+    "@capacitor/browser": "6.0.2",
     "@capacitor/core": "6.2.1",
     "@capacitor/local-notifications": "6.1.3"
   },

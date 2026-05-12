@@ -25,70 +25,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Inject build info
-        run: |
-          cat > www/build-info.js <<EOF
-          window.BUILD_SHA = "${{ github.sha }}";
-          window.BUILD_TIME = "$(date -u +%Y-%m-%dT%H:%M:%SZ)";
-          EOF
-          cat www/build-info.js
-
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Sync Capacitor
-        run: npx cap sync android
-
-      - name: Bump compileSdk/targetSdk to 35
-        working-directory: android
-        run: |
-          # Свежие зависимости Capgo (>=6.45) требуют compileSdk=35,
-          # а Capacitor 6 по дефолту ставит 34. Поднимаем без апгрейда
-          # самого Capacitor.
-          sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 35/' variables.gradle
-          sed -i 's/targetSdkVersion = [0-9]*/targetSdkVersion = 35/' variables.gradle
-          # play-services-tasks 18.4.1 требует minSdk>=23. Capacitor 6 ставит 22.
-          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 23/' variables.gradle
-          echo "--- variables.gradle ---"
-          grep -E "compileSdk|targetSdk|minSdk" variables.gradle
-
-      - name: Harden AndroidManifest (allowBackup=false)
-        working-directory: android/app/src/main
-        run: |
-          # Запрещаем adb backup, чтобы дневник нельзя было слить с устройства.
-          if grep -q 'android:allowBackup' AndroidManifest.xml; then
-            sed -i 's/android:allowBackup="[^"]*"/android:allowBackup="false"/' AndroidManifest.xml
-          else
-            sed -i 's|<application |<application android:allowBackup="false" |' AndroidManifest.xml
-          fi
-          grep -E "allowBackup|application " AndroidManifest.xml | head -3
-
-      - name: Add USE_EXACT_ALARM permission (Android 13+)
-        working-directory: android/app/src/main
-        run: |
-          # USE_EXACT_ALARM выдаётся автоматически приложениям-будильникам/
-          # календарям/напоминалкам на Android 13+ и снимает задержки Doze.
-          # Capacitor 6 не добавляет её сам (появилось в 7.x), поэтому
-          # вставляем вручную. Работает на ВСЕХ Android (Pixel, Samsung,
-          # Xiaomi, OnePlus и т.д.) — это часть стандартного Android API.
-          if ! grep -q 'USE_EXACT_ALARM' AndroidManifest.xml; then
-            sed -i 's|</manifest>|    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n</manifest>|' AndroidManifest.xml
-          fi
-          grep -E "uses-permission" AndroidManifest.xml
-
-      - name: Disable R8 minification (защита от поломки WebView/плагинов)
-        working-directory: android/app
-        run: |
-          # Capacitor-плагины используют рефлексию; R8 может их выкинуть.
-          # Лучше отключить, пока специально не настроена ProGuard-конфигурация.
-          if grep -q 'minifyEnabled' build.gradle; then
-            sed -i 's/minifyEnabled true/minifyEnabled false/' build.gradle
-          fi
-          grep -E "minifyEnabled|shrinkResources" build.gradle || true
+      - name: Run checks
+        run: npm run check
 
       - name: Compute version
         id: ver
@@ -97,6 +40,36 @@ jobs:
           OTA_VERSION="${BASE}.${{ github.run_number }}"
           echo "ota_version=${OTA_VERSION}" >> "$GITHUB_OUTPUT"
           echo "OTA version = ${OTA_VERSION}"
+
+      - name: Inject build info
+        run: |
+          BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          APK_URL="https://github.com/${{ github.repository }}/releases/download/latest/dnevnik.apk"
+          cat > www/build-info.js <<EOF
+          window.BUILD_SHA = "${{ github.sha }}";
+          window.BUILD_VERSION = "${{ steps.ver.outputs.ota_version }}";
+          window.BUILD_TIME = "${BUILD_TIME}";
+          EOF
+          cat > www/version.json <<EOF
+          {
+            "version": "${{ steps.ver.outputs.ota_version }}",
+            "sha": "${{ github.sha }}",
+            "buildTime": "${BUILD_TIME}",
+            "apkUrl": "${APK_URL}",
+            "sha256": ""
+          }
+          EOF
+          cat www/build-info.js
+          cat www/version.json
+
+      - name: Add Android platform
+        run: npx cap add android
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Patch Android project for CI
+        run: bash scripts/patch-android-ci.sh
 
       - name: Bump versionCode/versionName
         working-directory: android/app
@@ -128,13 +101,27 @@ jobs:
         run: |
           mkdir -p out
           cp "${{ steps.sign_app.outputs.signedReleaseFile }}" out/dnevnik.apk
+          APK_SHA256="$(sha256sum out/dnevnik.apk | awk '{print $1}')"
+          BUILD_TIME="$(node -p "require('./www/version.json').buildTime")"
+          cat > out/version.json <<EOF
+          {
+            "version": "${{ steps.ver.outputs.ota_version }}",
+            "sha": "${{ github.sha }}",
+            "buildTime": "${BUILD_TIME}",
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/download/latest/dnevnik.apk",
+            "sha256": "${APK_SHA256}"
+          }
+          EOF
           ls -la out/
+          cat out/version.json
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dnevnik-apk
-          path: out/dnevnik.apk
+          path: |
+            out/dnevnik.apk
+            out/version.json
 
       - name: Delete previous "latest" release
         if: github.ref == 'refs/heads/main'
@@ -152,6 +139,7 @@ jobs:
             ${{ github.sha }}
 
             Свежая сборка дневника. Версия: ${{ steps.ver.outputs.ota_version }}
+            Метаданные обновления: `version.json`.
 
             **Первичная установка на Samsung:**
             1. Скачай `dnevnik.apk` ниже.
@@ -163,6 +151,7 @@ jobs:
             Если не приходят уведомления — отключи оптимизацию батареи для приложения «Дневник».
           files: |
             out/dnevnik.apk
+            out/version.json
           make_latest: 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

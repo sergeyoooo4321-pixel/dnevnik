@@ -5,6 +5,7 @@
   const Cap = window.Capacitor;
   const LocalNotifications = Cap?.Plugins?.LocalNotifications || null;
   const SpeechRecognition = Cap?.Plugins?.SpeechRecognition || null;
+  const Browser = Cap?.Plugins?.Browser || null;
 
   // ---------- Tags ----------
   const TAGS = [
@@ -70,6 +71,8 @@
     if (!el) {
       el = document.createElement('div');
       el.className = 'toast';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
       document.body.appendChild(el);
     }
     el.textContent = text;
@@ -215,12 +218,14 @@
 
   function buildWheel(listEl, count, selected) {
     listEl.innerHTML = '';
+    listEl.setAttribute('role', 'listbox');
     const frag = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
       const item = document.createElement('div');
       item.className = 'wheel-item';
       item.textContent = pad(i);
       item.dataset.value = i;
+      item.setAttribute('role', 'option');
       frag.appendChild(item);
     }
     listEl.appendChild(frag);
@@ -229,13 +234,15 @@
       const idx = Math.max(0, Math.min(count - 1,
         Math.round(listEl.scrollTop / WHEEL_ITEM_H)));
       listEl.querySelectorAll('.wheel-item').forEach((el, i) => {
-        el.classList.toggle('selected', i === idx);
+        const active = i === idx;
+        el.classList.toggle('selected', active);
+        el.setAttribute('aria-selected', active ? 'true' : 'false');
       });
       listEl.dataset.value = idx;
     };
 
     let scrollTimer;
-    listEl.addEventListener('scroll', () => {
+    listEl.onscroll = () => {
       // Лёгкая «прилипающая» подсветка во время скролла.
       const idx = Math.round(listEl.scrollTop / WHEEL_ITEM_H);
       const cur = listEl.querySelector('.wheel-item.selected');
@@ -243,19 +250,22 @@
       if (next && cur !== next) {
         if (cur) cur.classList.remove('selected');
         next.classList.add('selected');
+        listEl.querySelectorAll('.wheel-item').forEach((el, i) =>
+          el.setAttribute('aria-selected', i === idx ? 'true' : 'false')
+        );
         listEl.dataset.value = idx;
       }
       clearTimeout(scrollTimer);
       scrollTimer = setTimeout(setSelected, 80);
-    });
+    };
 
     // Клик по элементу — плавный скролл к нему.
-    listEl.addEventListener('click', (e) => {
+    listEl.onclick = (e) => {
       const target = e.target.closest('.wheel-item');
       if (!target) return;
       const idx = parseInt(target.dataset.value, 10);
       listEl.scrollTo({ top: idx * WHEEL_ITEM_H, behavior: 'smooth' });
-    });
+    };
 
     // Стартовая позиция без анимации.
     listEl.scrollTop = selected * WHEEL_ITEM_H;
@@ -439,14 +449,57 @@
   //  ДЕНЬ
   // ===================================================================
   let currentRating = 0;
+  let selectedDayKey = dateKey();
+  let historyQuery = '';
+
+  const readEntry = (key) => {
+    try {
+      const raw = localStorage.getItem('entry-' + key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const getEntries = () => {
+    const entries = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('entry-')) continue;
+      try {
+        const entry = JSON.parse(localStorage.getItem(key));
+        if (entry && entry.date) entries.push(entry);
+      } catch (_) {}
+    }
+    return entries.sort((a, b) => b.date.localeCompare(a.date));
+  };
+
+  const dayHint = (key) => {
+    const diff = daysBetween(dateKey(), key);
+    if (diff === 0) return 'Сегодня';
+    if (diff === -1) return 'Вчера';
+    if (diff === 1) return 'Завтра';
+    return diff < 0 ? `${Math.abs(diff)} дн. назад` : `через ${diff} дн.`;
+  };
+
+  const updateDayHeader = () => {
+    $('todayDate').textContent = formatDate(selectedDayKey);
+    $('todayHint').textContent = dayHint(selectedDayKey);
+    const nextBtn = $('nextDay');
+    if (nextBtn) nextBtn.disabled = selectedDayKey >= dateKey();
+  };
 
   const renderStars = (rating) => {
     const c = $('stars');
     c.innerHTML = '';
     for (let i = 1; i <= 10; i++) {
-      const star = document.createElement('div');
+      const star = document.createElement('button');
+      star.type = 'button';
       star.className = 'star' + (i <= rating ? ' active' : '');
       star.textContent = '★';
+      star.setAttribute('role', 'radio');
+      star.setAttribute('aria-checked', currentRating === i ? 'true' : 'false');
+      star.setAttribute('aria-label', `${i} из 10`);
       star.addEventListener('click', () => {
         currentRating = currentRating === i ? 0 : i;
         renderStars(currentRating);
@@ -457,10 +510,8 @@
   };
 
   const loadToday = () => {
-    const key = dateKey();
-    $('todayDate').textContent = formatDate(key);
-    const raw = localStorage.getItem('entry-' + key);
-    const entry = raw ? JSON.parse(raw) : null;
+    updateDayHeader();
+    const entry = readEntry(selectedDayKey);
     currentRating = entry?.rating || 0;
     $('done').value = entry?.done || '';
     $('improve').value = entry?.improve || '';
@@ -468,37 +519,67 @@
     renderStars(currentRating);
   };
 
+  const setSelectedDay = (key) => {
+    selectedDayKey = key;
+    loadToday();
+  };
+
+  $('prevDay').addEventListener('click', () => setSelectedDay(addDays(selectedDayKey, -1)));
+  $('nextDay').addEventListener('click', () => {
+    if (selectedDayKey < dateKey()) setSelectedDay(addDays(selectedDayKey, 1));
+  });
+  $('todayJump').addEventListener('click', () => setSelectedDay(dateKey()));
+
   $('save').addEventListener('click', () => {
-    const key = dateKey();
     const entry = {
-      date: key,
+      date: selectedDayKey,
       rating: currentRating,
       done: $('done').value.trim(),
       improve: $('improve').value.trim(),
       updatedAt: Date.now(),
     };
-    localStorage.setItem('entry-' + key, JSON.stringify(entry));
+    localStorage.setItem('entry-' + selectedDayKey, JSON.stringify(entry));
+    if ($('history')?.classList.contains('active')) renderHistory();
     toast('День сохранён');
   });
 
   // ===================================================================
   //  ИСТОРИЯ
   // ===================================================================
+  const renderHistoryStats = (entries) => {
+    const el = $('historyStats');
+    if (!el) return;
+    const rated = entries.filter((e) => Number(e.rating) > 0);
+    const avg = rated.length
+      ? (rated.reduce((sum, e) => sum + Number(e.rating || 0), 0) / rated.length).toFixed(1)
+      : '—';
+    const days = new Set(entries.map((e) => e.date));
+    let streak = 0;
+    for (let k = dateKey(); days.has(k); k = addDays(k, -1)) streak++;
+    el.innerHTML = `
+      <div class="stat-card"><span>Записей</span><strong>${entries.length}</strong></div>
+      <div class="stat-card"><span>Средняя</span><strong>${avg}</strong></div>
+      <div class="stat-card"><span>Серия</span><strong>${streak}</strong></div>
+    `;
+  };
+
   const renderHistory = () => {
-    const entries = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('entry-')) {
-        try {
-          entries.push(JSON.parse(localStorage.getItem(key)));
-        } catch (_) {}
-      }
-    }
-    entries.sort((a, b) => b.date.localeCompare(a.date));
+    const allEntries = getEntries();
+    renderHistoryStats(allEntries);
+
+    const q = historyQuery.trim().toLowerCase();
+    const entries = q
+      ? allEntries.filter((e) =>
+          [formatDate(e.date), e.done, e.improve, String(e.rating || '')]
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+        )
+      : allEntries;
 
     const c = $('entries');
     if (!entries.length) {
-      c.innerHTML = '<div class="empty">Пока нет записей</div>';
+      c.innerHTML = `<div class="empty">${allEntries.length ? 'Ничего не найдено' : 'Пока нет записей'}</div>`;
       return;
     }
 
@@ -509,15 +590,43 @@
 
     c.innerHTML = entries
       .map((e) => `
-        <div class="entry">
+        <div class="entry" data-date="${escape(e.date)}">
           <div class="entry-header">
             <span class="entry-date">${formatDate(e.date)}</span>
             <span class="entry-rating">${e.rating ? '★'.repeat(e.rating) + '☆'.repeat(10 - e.rating) : '—'}</span>
           </div>
           ${block('Сделал', e.done)}
           ${block('Улучшить', e.improve)}
+          <div class="entry-actions">
+            <button type="button" class="ghost compact entry-edit" data-date="${escape(e.date)}">Редактировать</button>
+            <button type="button" class="delete entry-delete" data-date="${escape(e.date)}" aria-label="Удалить запись за ${formatDate(e.date)}">×</button>
+          </div>
         </div>`).join('');
+
+    c.querySelectorAll('.entry-edit').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        setSelectedDay(btn.dataset.date);
+        switchTab('today');
+      })
+    );
+    c.querySelectorAll('.entry-delete').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.date;
+        if (!confirm(`Удалить запись за ${formatDate(key)}?`)) return;
+        localStorage.removeItem('entry-' + key);
+        if (selectedDayKey === key) loadToday();
+        renderHistory();
+      })
+    );
   };
+
+  const historySearch = $('historySearch');
+  if (historySearch) {
+    historySearch.addEventListener('input', () => {
+      historyQuery = historySearch.value;
+      renderHistory();
+    });
+  }
 
   // ===================================================================
   //  ЗАМЕТКИ
@@ -934,10 +1043,48 @@
 
 
   // ===================================================================
-  //  ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ — сравнить SHA коммита и открыть APK в браузере
+  //  ОБНОВЛЕНИЕ ПРИЛОЖЕНИЯ — скачать manifest и открыть APK в системном браузере
   // ===================================================================
   const REPO = 'sergeyoooo4321-pixel/dnevnik';
   const APK_URL = `https://github.com/${REPO}/releases/download/latest/dnevnik.apk`;
+  const VERSION_URL = `https://github.com/${REPO}/releases/download/latest/version.json`;
+  const RELEASE_API_URL = `https://api.github.com/repos/${REPO}/releases/tags/latest`;
+  const VERSION_ASSET = 'version.json';
+
+  async function openExternalUrl(url) {
+    if (Browser?.open) {
+      await Browser.open({ url });
+      return;
+    }
+    const opened = window.open(url, '_system');
+    if (!opened) window.location.href = url;
+  }
+
+  async function fetchUpdateManifest() {
+    const releaseRes = await fetch(RELEASE_API_URL, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/vnd.github+json' },
+    });
+    if (!releaseRes.ok) throw new Error('GitHub release HTTP ' + releaseRes.status);
+
+    const release = await releaseRes.json();
+    const asset = (release.assets || []).find((a) => a.name === VERSION_ASSET);
+    if (!asset) throw new Error('version.json not found');
+
+    try {
+      const directRes = await fetch(asset.browser_download_url || VERSION_URL, { cache: 'no-store' });
+      if (directRes.ok) return await directRes.json();
+    } catch (_) {
+      // Some WebViews reject redirected release assets by CORS; API asset URL is the fallback.
+    }
+
+    const assetRes = await fetch(asset.url, {
+      cache: 'no-store',
+      headers: { 'Accept': 'application/octet-stream' },
+    });
+    if (!assetRes.ok) throw new Error('version asset HTTP ' + assetRes.status);
+    return JSON.parse(await assetRes.text());
+  }
 
   async function checkForUpdate() {
     const btn = document.getElementById('update-btn');
@@ -945,22 +1092,22 @@
     btn.textContent = 'Проверяю';
     btn.disabled = true;
     try {
-      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-        headers: { 'Accept': 'application/vnd.github+json' },
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const remoteSha = (data.body || '').trim().split(/\s+/)[0];
+      const manifest = await fetchUpdateManifest();
+      const remoteSha = String(manifest.sha || '');
+      const remoteVersion = String(manifest.version || '');
       if (remoteSha && remoteSha === window.BUILD_SHA) {
         btn.textContent = 'Актуальная версия';
+        toast('Уже стоит свежая версия');
         await new Promise((r) => setTimeout(r, 2000));
         return;
       }
-      if (confirm('Доступна новая версия. Скачать APK?')) {
-        window.open(APK_URL, '_system');
+      const label = remoteVersion ? ` ${remoteVersion}` : '';
+      if (confirm(`Доступна новая версия${label}. Скачать APK?`)) {
+        await openExternalUrl(manifest.apkUrl || APK_URL);
       }
     } catch (e) {
-      alert('Не удалось проверить обновление: ' + (e && e.message ? e.message : e));
+      console.error('update check', e);
+      toast('Не удалось проверить обновление');
     } finally {
       btn.textContent = 'Обновить';
       btn.disabled = false;

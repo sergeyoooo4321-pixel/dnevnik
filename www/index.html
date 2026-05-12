@@ -32,17 +32,24 @@
   <main>
     <!-- ===== СЕГОДНЯ ===== -->
     <section id="today" class="screen active">
-      <div class="subtitle" id="todayDate"></div>
+      <div class="day-switcher" aria-label="Выбор дня">
+        <button type="button" class="day-nav" id="prevDay" aria-label="Предыдущий день">‹</button>
+        <button type="button" class="day-current" id="todayJump">
+          <span class="subtitle" id="todayDate"></span>
+          <span class="day-current-sub" id="todayHint">Сегодня</span>
+        </button>
+        <button type="button" class="day-nav" id="nextDay" aria-label="Следующий день">›</button>
+      </div>
 
       <div class="field">
-        <label>Оценка дня</label>
-        <div class="stars" id="stars"></div>
+        <label id="ratingLabel">Оценка дня</label>
+        <div class="stars" id="stars" role="radiogroup" aria-labelledby="ratingLabel"></div>
         <div class="rating-value" id="ratingValue">—</div>
       </div>
 
       <div class="field">
         <div class="label-row">
-          <label>Что сделал сегодня</label>
+          <label for="done">Что сделал</label>
           <button class="mic" data-target="done" aria-label="Голос">🎤</button>
         </div>
         <textarea id="done" placeholder="Что было сделано…"></textarea>
@@ -50,7 +57,7 @@
 
       <div class="field">
         <div class="label-row">
-          <label>Что улучшить</label>
+          <label for="improve">Что улучшить</label>
           <button class="mic" data-target="improve" aria-label="Голос">🎤</button>
         </div>
         <textarea id="improve" placeholder="Что хочется поправить…"></textarea>
@@ -64,7 +71,7 @@
       <div class="card">
         <div class="field">
           <div class="label-row">
-            <label>Новая заметка</label>
+            <label for="noteText">Новая заметка</label>
             <button class="mic" data-target="noteText" aria-label="Голос">🎤</button>
           </div>
           <textarea id="noteText" placeholder="Мысль, идея, что угодно…"></textarea>
@@ -90,6 +97,13 @@
 
     <!-- ===== ИСТОРИЯ ===== -->
     <section id="history" class="screen">
+      <div class="history-panel">
+        <div class="history-stats" id="historyStats" aria-live="polite"></div>
+        <div class="field">
+          <label for="historySearch">Поиск</label>
+          <input type="text" id="historySearch" placeholder="Дата, сделано, улучшить…">
+        </div>
+      </div>
       <div id="entries"></div>
     </section>
 
@@ -103,7 +117,7 @@
 
         <div class="field">
           <div class="label-row">
-            <label>Сообщение</label>
+            <label for="reminderText">Сообщение</label>
             <button class="mic" data-target="reminderText" aria-label="Голос">🎤</button>
           </div>
           <input type="text" id="reminderText" placeholder="Что напомнить?">
@@ -158,7 +172,7 @@
     <section id="plan" class="screen">
       <div class="schedule-head">
         <div class="schedule-day-title" id="scheduleDayTitle"></div>
-        <button class="add-pill" id="addEventBtn" aria-label="Добавить событие">+ Добавить</button>
+        <button type="button" class="add-pill" id="addEventBtn" aria-label="Добавить событие">+ Добавить</button>
       </div>
       <div id="scheduleEventList"></div>
 
@@ -177,10 +191,10 @@
   </main>
 
   <!-- Event modal -->
-  <div id="eventOverlay" class="modal-overlay" hidden>
+  <div id="eventOverlay" class="modal-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="eventModalTitle">
     <div class="modal">
       <div class="modal-head">
-        <div class="modal-title">Новое событие</div>
+        <div class="modal-title" id="eventModalTitle">Новое событие</div>
         <button class="ghost modal-close" id="eventCloseBtn" aria-label="Закрыть">×</button>
       </div>
 
@@ -193,13 +207,13 @@
       </div>
 
       <div class="field">
-        <label>Событие</label>
+        <label for="eventTitle">Событие</label>
         <input type="text" id="eventTitle" placeholder="Например, сходить в магазин">
       </div>
 
       <div class="field">
         <div class="label-row">
-          <label>Примечание</label>
+          <label for="eventNote">Примечание</label>
           <button class="mic" data-target="eventNote" aria-label="Голос">🎤</button>
         </div>
         <textarea id="eventNote" placeholder="Необязательно"></textarea>
@@ -213,9 +227,9 @@
   </div>
 
   <!-- Date picker (мини-календарь bottom-sheet) -->
-  <div id="datePickerOverlay" class="datepicker-overlay" hidden>
+  <div id="datePickerOverlay" class="datepicker-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="datePickerTitle">
     <div class="datepicker">
-      <div class="datepicker-title">Дата</div>
+      <div class="datepicker-title" id="datePickerTitle">Дата</div>
       <div class="datepicker-head">
         <button type="button" class="cal-nav" id="datePickerPrev" aria-label="Предыдущий месяц">‹</button>
         <div class="datepicker-month" id="datePickerMonth"></div>
@@ -233,9 +247,9 @@
   </div>
 
   <!-- Wheel time picker -->
-  <div id="timePickerOverlay" class="timepicker-overlay" hidden>
+  <div id="timePickerOverlay" class="timepicker-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="timePickerTitle">
     <div class="timepicker">
-      <div class="timepicker-title">Время</div>
+      <div class="timepicker-title" id="timePickerTitle">Время</div>
       <div class="timepicker-wheels">
         <div class="wheel" data-unit="h">
           <div class="wheel-frame"></div>
