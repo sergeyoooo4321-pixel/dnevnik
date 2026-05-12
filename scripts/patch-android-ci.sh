@@ -25,8 +25,9 @@ set_manifest_attr() {
   local file="$1"
   local attr="$2"
   local value="$3"
+  local escaped_value="${value//&/\\&}"
   if grep -q "android:${attr}=" "$file"; then
-    sed -i -E "s/android:${attr}=\"[^\"]*\"/android:${attr}=\"${value}\"/" "$file"
+    sed -i -E "s|android:${attr}=\"[^\"]*\"|android:${attr}=\"${escaped_value}\"|" "$file"
   else
     sed -i -E "0,/<application /s//<application android:${attr}=\"${value}\" /" "$file"
   fi
