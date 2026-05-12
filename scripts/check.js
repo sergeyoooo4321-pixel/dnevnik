@@ -30,7 +30,7 @@ JSON.parse(read('capacitor.config.json'));
 for (const file of [
   'assets/icon/play-store-icon.png',
   'assets/icon/feature-graphic.png',
-  'assets/android/drawable/ic_launcher.xml',
+  'assets/android-res/drawable/ic_launcher.xml',
   'docs/privacy-policy.html',
   'play/README.md',
   'play/data-safety.md',

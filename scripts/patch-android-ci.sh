@@ -52,13 +52,13 @@ install_launcher_icons() {
     android/app/src/main/res/values
 
   find android/app/src/main/res -path '*/mipmap-*' -name 'ic_launcher*.png' -delete
-  cp assets/android/drawable/ic_launcher.xml android/app/src/main/res/drawable/ic_launcher.xml
-  cp assets/android/drawable/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_foreground.xml
-  cp assets/android/mipmap-anydpi/ic_launcher.xml android/app/src/main/res/mipmap-anydpi/ic_launcher.xml
-  cp assets/android/mipmap-anydpi/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
-  cp assets/android/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-  cp assets/android/mipmap-anydpi-v26/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
-  cp assets/android/values/ic_launcher_background.xml android/app/src/main/res/values/ic_launcher_background.xml
+  cp assets/android-res/drawable/ic_launcher.xml android/app/src/main/res/drawable/ic_launcher.xml
+  cp assets/android-res/drawable/ic_launcher_foreground.xml android/app/src/main/res/drawable/ic_launcher_foreground.xml
+  cp assets/android-res/mipmap-anydpi/ic_launcher.xml android/app/src/main/res/mipmap-anydpi/ic_launcher.xml
+  cp assets/android-res/mipmap-anydpi/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi/ic_launcher_round.xml
+  cp assets/android-res/mipmap-anydpi-v26/ic_launcher.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+  cp assets/android-res/mipmap-anydpi-v26/ic_launcher_round.xml android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+  cp assets/android-res/values/ic_launcher_background.xml android/app/src/main/res/values/ic_launcher_background.xml
 }
 
 require_file android/variables.gradle
